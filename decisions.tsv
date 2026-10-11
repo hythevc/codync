@@ -1,0 +1,4 @@
+timestamp	phase	decision	reason	evidence	result
+2026-10-11T11:36:29+01:00	harness adoption	autopilot-stack	Coupled dependency/packaging/native checks require human eyes and exact-head independent merge acceptance	docs/guide/06-harness.md; docs/gate-questions.md#answers	RECORDED; no commit or merge authority
+2026-10-11T11:36:29+01:00	feature map	Retain grounded draft status for native feature recipes	No target native runtime/user-path proof in this lane; test pass is not GUI acceptance	VERIFY/codync/SKILL.md; docs/premortem.md	E2E BLOCKED; no generator completion claim
+2026-10-11T11:36:29+01:00	regression coverage	Use existing deterministic computer-order test	Real renderer store exercised with mocked persistence and network calls forbidden by fixture	apps/desktop/src/renderer/lib/computer-order.test.ts; /tmp/harness-adoption-receipt/computer-order.log	PASS: exit 0; 1 passed, 0 skipped
