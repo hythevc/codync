@@ -1,0 +1,2 @@
+timestamp	phase	decision	reason	evidence	result
+2026-10-11T10:33:12.011148+00:00	harness adoption	autopilot-stack	Coupled uncommitted changes; human eyes and independent exact-head acceptance before merge.	docs/guide/01-harness-contract.md; VERIFY/squadbots/SKILL.md	Selected; autopilot-full not authorized; merge-ready BLOCKED.
