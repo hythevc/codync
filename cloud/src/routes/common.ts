@@ -234,7 +234,7 @@ export async function notify(env: Env, computerId: string, blocked: Blocked[] = 
   try {
     const res = await env.RELAY.get(env.RELAY.idFromName(computerId)).fetch(`https://do${path}`, {
       method: "POST",
-      headers: { "X-Codync-Internal": "1", "Content-Type": "application/json" },
+      headers: { "X-Squadbots-Internal": "1", "Content-Type": "application/json" },
       body: JSON.stringify(blocked.length ? { devices: blocked } : {}),
     });
     if (!res.ok) console.error("relay notify failed", { computerId, path, status: res.status });

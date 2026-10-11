@@ -10,9 +10,9 @@ the widget: the working bot (`CodyncBot-<shape>-Ink` / `-Tint`) and the thinking
 The frames come from the app's own drawing code (`DottedBody.workingLoop`,
 `ThinkingOrbGeometry.workingLoop`):
 
-    cd apps/ios/Kit && TEST_RUNNER_CODYNC_FRAMES_FILE=/tmp/frames.json xcodebuild test \
-      -scheme CodyncKit-Package -derivedDataPath ../../../build/dd \
-      -destination 'platform=iOS Simulator,id=<sim>' '-only-testing:CodyncKitTests/exportBotFrames()'
+    cd apps/ios/Kit && TEST_RUNNER_SQUADBOTS_FRAMES_FILE=/tmp/frames.json xcodebuild test \
+      -scheme SquadbotsKit-Package -derivedDataPath ../../../build/dd \
+      -destination 'platform=iOS Simulator,id=<sim>' '-only-testing:SquadbotsKitTests/exportBotFrames()'
     tools/timer-fonts.py /tmp/frames.json apps/ios/Widgets/Resources/Fonts
 """
 
@@ -69,7 +69,7 @@ def names(name):
     """The name records App Store font validation requires (family, style, unique, full,
     version, PostScript); without the full name and version it rejects the build (ITMS-90853)."""
     family = name.replace("-", " ")
-    return {"familyName": family, "styleName": "Regular", "uniqueFontIdentifier": f"Codync: {name}",
+    return {"familyName": family, "styleName": "Regular", "uniqueFontIdentifier": f"Squadbots: {name}",
             "fullName": family, "version": "Version 1.000", "psName": name}
 
 

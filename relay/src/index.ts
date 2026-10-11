@@ -1,8 +1,8 @@
-// Codync push relay.
+// Squadbots push relay.
 //
 // The APNs key lives only here. The phone registers its device (or Live
 // Activity) token and gets back an opaque, encrypted *ticket*; it hands the
-// ticket to its own codync-host, which can then ask the relay to push to that
+// ticket to its own squadbots-host, which can then ask the relay to push to that
 // one device — without ever learning the raw token or holding a shared secret.
 //
 //   POST /register { token, env: "sandbox" | "production", kind: "alert" | "liveactivity" } -> { ticket }
@@ -26,7 +26,7 @@ type ApnsEnv = "sandbox" | "production";
 type Kind = "alert" | "liveactivity";
 interface TicketPayload { t: string; e: ApnsEnv; k: Kind; b?: string }
 
-const BUNDLE_ID = "com.pokai.Codync.ios";
+const BUNDLE_ID = "ai.squadbots.Squadbots.ios";
 
 // ---- tickets (AES-GCM, key from TICKET_KEY) ----
 
@@ -122,7 +122,7 @@ export interface PushBody {
 /** The `aps` dictionary for an alert push. */
 export function alertAps(body: PushBody & { alert: NonNullable<PushBody["alert"]> }): Record<string, unknown> {
   const aps: Record<string, unknown> = {
-    alert: { title: (body.alert.title ?? "Codync").slice(0, 120), body: (body.alert.body ?? "").slice(0, 400) },
+    alert: { title: (body.alert.title ?? "Squadbots").slice(0, 120), body: (body.alert.body ?? "").slice(0, 400) },
     sound: "default",
     "thread-id": body.threadId,
     category: body.category,

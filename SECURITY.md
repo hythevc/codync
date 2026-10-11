@@ -1,10 +1,10 @@
 # Security Policy
 
-Codync is a remote control for coding agents running on your computer. Read the trust model below before you report anything: most reports we get describe intended behavior.
+Squadbots is a remote control for coding agents running on your computer. Read the trust model below before you report anything: most reports we get describe intended behavior.
 
 ## Trust model
 
-- **The computer owner is trusted.** Anything that already runs as the user on the host computer (local apps, shells, files in `~/.codync`) is outside Codync's boundary.
+- **The computer owner is trusted.** Anything that already runs as the user on the host computer (local apps, shells, files in `~/.squadbots`) is outside Squadbots's boundary.
 - **A paired device is trusted like the owner.** A device is added only with the owner's consent on the computer: by scanning a one-time pairing code, or by approving an account access request. Once paired, it is meant to have full control of the computer. It can run coding agents (they execute shell commands, by default without asking), change any bot's configuration (agent, launch command, working folder, permission mode), and view and control the screen. A paired device can run code on the computer **by design**. That is the product.
 - **Everyone else is untrusted.** This includes the network, the Cloudflare relay (it forwards end-to-end encrypted traffic it cannot read), the push relay, unpaired devices, and anyone holding an expired or used pairing code.
 
@@ -32,11 +32,11 @@ We close these without a reply:
 
 ## How to report
 
-Use [GitHub private vulnerability reporting](https://github.com/leepokai/Codync/security/advisories/new). Don't open a public issue. Reports sent by email aren't tracked.
+Use [GitHub private vulnerability reporting](https://github.com/jaimedhenriques/squadbots/security/advisories/new). Don't open a public issue. Reports sent by email aren't tracked.
 
 A report must include:
 
-1. The Codync version you tested (a released build, not a guess about `main`).
+1. The Squadbots version you tested (a released build, not a guess about `main`).
 2. Which trust boundary from this page it crosses, and the attacker's starting position.
 3. Steps you ran that reproduce it, plus the actual output or a recording. Pasted source code alone isn't a reproduction.
 
@@ -44,9 +44,9 @@ Reports without a working reproduction, or that describe behavior listed above a
 
 ## CVEs and advisories
 
-We publish a GitHub Security Advisory, and request a CVE through GitHub, only for issues we have confirmed as in scope and fixed. Severity is our call. Please don't request a CVE for Codync from another CNA. For a confirmed issue we credit you in the advisory unless you ask us not to.
+We publish a GitHub Security Advisory, and request a CVE through GitHub, only for issues we have confirmed as in scope and fixed. Severity is our call. Please don't request a CVE for Squadbots from another CNA. For a confirmed issue we credit you in the advisory unless you ask us not to.
 
-Codync is free, open source, and maintained by one person. There is no bug bounty.
+Squadbots is free, open source, and maintained by one person. There is no bug bounty.
 
 ## Supported versions
 

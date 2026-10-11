@@ -35,7 +35,7 @@ impl Actor {
                 if method == "session/request_permission" && self.turn.is_some() {
                     self.on_permission(id, params).await;
                 } else {
-                    let _ = acp.respond_error(id, -32601, &format!("{method} is not supported by Codync")).await;
+                    let _ = acp.respond_error(id, -32601, &format!("{method} is not supported by Squadbots")).await;
                 }
             }
         }

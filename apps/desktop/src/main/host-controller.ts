@@ -10,12 +10,12 @@ import { unregisterScreenAgent } from './screen'
 import { identity } from './environment'
 import { hostEnvironmentError } from '../shared/environment'
 
-/** `CODYNC_PORT` / `CODYNC_HOME` point the app at a dev host started with `codync-host serve`. */
-export const devPort = process.env.CODYNC_PORT ? Number(process.env.CODYNC_PORT) : null
+/** `SQUADBOTS_PORT` / `SQUADBOTS_HOME` point the app at a dev host started with `squadbots-host serve`. */
+export const devPort = process.env.SQUADBOTS_PORT ? Number(process.env.SQUADBOTS_PORT) : null
 export const port = devPort ?? identity.port
-export const dataDir = process.env.CODYNC_HOME ?? join(homedir(), identity.dataFolder)
-if (identity.environment === 'dev' && (port === 19222 || resolve(dataDir) === resolve(homedir(), '.codync'))) {
-  throw new Error('Codync Dev requires its own host port and data directory.')
+export const dataDir = process.env.SQUADBOTS_HOME ?? join(homedir(), identity.dataFolder)
+if (identity.environment === 'dev' && (port === 19222 || resolve(dataDir) === resolve(homedir(), '.squadbots'))) {
+  throw new Error('Squadbots Dev requires its own host port and data directory.')
 }
 export const baseURL = `http://127.0.0.1:${port}`
 
@@ -52,7 +52,7 @@ const isWindows = platform() === 'win32'
 /** macOS and Windows ship the host inside the app; Linux uses the installed one. */
 export const bundlesHost = isMac || isWindows
 
-/** The service definition `codync-host install` wrote (`null`: not installed). */
+/** The service definition `squadbots-host install` wrote (`null`: not installed). */
 function serviceDefinition(): string | null {
   try {
     if (isWindows) {
@@ -72,7 +72,7 @@ function serviceDefinition(): string | null {
 const serviceInstalled = () => serviceDefinition() !== null
 
 /**
- * Manages the local codync-host (binary, background service, health) the way the native
+ * Manages the local squadbots-host (binary, background service, health) the way the native
  * apps did: bundled next to the app, else a Homebrew / cargo install.
  */
 export class HostController extends EventEmitter {
@@ -88,19 +88,19 @@ export class HostController extends EventEmitter {
 
   get binary(): string | null {
     const candidates = [
-      app.isPackaged && isMac ? join(process.resourcesPath, 'codync-host') : null,
-      app.isPackaged && isWindows ? join(process.resourcesPath, 'codync-host.exe') : null,
-      process.env.CODYNC_HOST_BIN ?? null,
+      app.isPackaged && isMac ? join(process.resourcesPath, 'squadbots-host') : null,
+      app.isPackaged && isWindows ? join(process.resourcesPath, 'squadbots-host.exe') : null,
+      process.env.SQUADBOTS_HOST_BIN ?? null,
       ...(identity.environment === 'dev' ? [
-        join(__dirname, '../../build/native/codync-host'),
-        join(__dirname, '../../../../host/target/debug/codync-host'),
-        join(homedir(), '.local/bin/codync-dev-host'),
+        join(__dirname, '../../build/native/squadbots-host'),
+        join(__dirname, '../../../../host/target/debug/squadbots-host'),
+        join(homedir(), '.local/bin/squadbots-dev-host'),
       ] : [
-        join(homedir(), '.local/bin/codync-host'),
-        '/opt/homebrew/bin/codync-host',
-        '/usr/local/bin/codync-host',
-        '/usr/bin/codync-host',
-        join(homedir(), '.cargo/bin/codync-host'),
+        join(homedir(), '.local/bin/squadbots-host'),
+        '/opt/homebrew/bin/squadbots-host',
+        '/usr/local/bin/squadbots-host',
+        '/usr/bin/squadbots-host',
+        join(homedir(), '.cargo/bin/squadbots-host'),
       ]),
     ]
     return candidates.find((c): c is string => !!c && existsSync(c)) ?? null
@@ -340,8 +340,8 @@ function resolved(path: string) {
 function serviceRuns(bin: string) {
   const service = serviceDefinition()
   if (service === null) return false
-  // Windows' service starts the launcher next to the host (codync-hostw.exe).
-  const runs = (path: string) => service.includes(isWindows ? path.replace(/codync-host\.exe$/, identity.supervisor) : path)
+  // Windows' service starts the launcher next to the host (squadbots-hostw.exe).
+  const runs = (path: string) => service.includes(isWindows ? path.replace(/squadbots-host\.exe$/, identity.supervisor) : path)
   return runs(bin) || runs(resolved(bin))
 }
 

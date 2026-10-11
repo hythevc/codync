@@ -1,8 +1,8 @@
 [package]
-name = "codync-screen"
+name = "squadbots-screen"
 version = "2.1.0"
 edition = "2024"
-description = "Codync Remote screen helper for Linux: xdg portals + PipeWire + GStreamer WebRTC"
+description = "Squadbots Remote screen helper for Linux: xdg portals + PipeWire + GStreamer WebRTC"
 license = "Apache-2.0"
 
 [dependencies]

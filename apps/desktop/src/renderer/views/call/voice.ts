@@ -25,11 +25,11 @@ export const providerName = (p: VoiceProvider) => voiceInfo[p].name
 export const SPEECH_CHUNK: Record<VoiceProvider, number> = { openai: 600, gemini: 150 }
 
 /** Recognition through the Swift helper: macOS only. */
-export const onDeviceAvailable = () => window.codync.speech.available
+export const onDeviceAvailable = () => window.squadbots.speech.available
 export const onDeviceUnavailableReason = () =>
-  window.codync.platform === 'darwin'
+  window.squadbots.platform === 'darwin'
     ? "On-device speech isn't available in this build."
-    : `On-device speech isn't available on ${window.codync.platform === 'win32' ? 'Windows' : 'Linux'}.`
+    : `On-device speech isn't available on ${window.squadbots.platform === 'win32' ? 'Windows' : 'Linux'}.`
 
 export const VoiceSettings = {
   /** The provider picked in the call settings; null for on-device. */
@@ -112,7 +112,7 @@ export abstract class VoiceEngine extends Observable {
 }
 
 export const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e))
-export const MIC_DENIED = 'Allow the microphone for Codync in Settings to talk to your bots.'
+export const MIC_DENIED = 'Allow the microphone for Squadbots in Settings to talk to your bots.'
 
 // MARK: audio helpers
 

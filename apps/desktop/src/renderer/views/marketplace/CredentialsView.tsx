@@ -71,7 +71,7 @@ export function CredentialsView({ onBack }: { onBack: () => void }) {
           <CredentialField label="Service account token" value={token} onChange={setToken} placeholder="Paste your token" secret />
           <div><Button disabled={busy || !token} onClick={() => void save(token)}>Connect</Button></div>
           {status?.onePasswordConnected ? <div><Button kind="secondary" disabled={busy} onClick={() => void save('')}>Disconnect</Button></div> : null}
-          <span style={{ ...font('footnote'), color: 'var(--secondary)' }}>Use op://vault/item/field in a connector's credential field. Codync retrieves the value when the connector runs.</span>
+          <span style={{ ...font('footnote'), color: 'var(--secondary)' }}>Use op://vault/item/field in a connector's credential field. Squadbots retrieves the value when the connector runs.</span>
         </CardSection>
         {busy ? <Spinner /> : null}
         {error ? <ErrorText text={error} /> : null}

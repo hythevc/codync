@@ -1,13 +1,13 @@
 # Engram memory integration
 
-Codync uses [Engram v3.2.1](https://github.com/Gentleman-Programming/engram/releases/tag/v3.2.1)
-for durable memory. Codync supplies chat capture, automatic extraction, prompt recall and management UI.
+Squadbots uses [Engram v3.2.1](https://github.com/Gentleman-Programming/engram/releases/tag/v3.2.1)
+for durable memory. Squadbots supplies chat capture, automatic extraction, prompt recall and management UI.
 ACP still owns the agent conversation and compaction; the built-in **memory MCP server** exposes Engram's
-native tools plus Codync's `search_history`. ACP and MCP have different responsibilities.
+native tools plus Squadbots's `search_history`. ACP and MCP have different responsibilities.
 
 ## Storage and runtime
 
-Each bot has an independent `bots/<id>/engram/engram.db` under `CODYNC_HOME` (normally `~/.codync`).
+Each bot has an independent `bots/<id>/engram/engram.db` under `SQUADBOTS_HOME` (normally `~/.squadbots`).
 The host downloads the MIT-licensed release on first use, validates its SHA-256 against
 `packaging/engram/release.json`, and installs it with its license in `engram/3.2.1/`.
 First use requires network access; subsequent use works offline. Supported binaries are macOS, Linux and
@@ -19,7 +19,7 @@ replayed: a write may have reached SQLite before its acknowledgement was lost. I
 Engram cloud autosync is disabled. Bot isolation is a separate database and tool routing, not a filesystem
 sandbox for an agent that already has shell access.
 
-Engram owns schema migrations and every database write. Codync reads the pinned schema in read-only mode
+Engram owns schema migrations and every database write. Squadbots reads the pinned schema in read-only mode
 for structured management, prompt facts and full FTS pagination. Upgrading the pin requires rerunning native
 integration tests and checking this schema contract. This is keyword/trigram FTS5 search, not vector similarity.
 Short one/two-character queries use escaped substring matching; longer terms use the existing FTS index.
@@ -30,12 +30,12 @@ Native MCP search retains Engram's own result limits; the management screen pagi
 On a bot's first memory access, `memory/profile.md` and `memory/log/*.md` are copied verbatim into an
 immutable `engram/markdown-backup.json` import journal. Each dated bullet receives a deterministic sync ID;
 its original date, content, profile/log scope and source path/line are imported through the native CLI.
-The host verifies every imported ID before writing `.codync-markdown-imported`. Interrupted imports retry
+The host verifies every imported ID before writing `.squadbots-markdown-imported`. Interrupted imports retry
 without duplicating records. Malformed dated rows fail visibly instead of being silently discarded.
 The original Markdown remains untouched as a backup and is no longer authoritative.
 
 The completion marker is retained by **Forget everything** so old Markdown cannot reappear. Removing the
-marker is a deliberate recovery operation, not part of normal startup. To roll back to an older Codync build,
+marker is a deliberate recovery operation, not part of normal startup. To roll back to an older Squadbots build,
 stop the host first and retain both the Engram directory and original Markdown. The original files contain
 only pre-migration memory; newer Engram data must be exported separately and is not automatically converted
 back into the legacy format.
@@ -54,7 +54,7 @@ consolidating a crowded profile, and saving native `session_summary` observation
 minutes or eight queued exchanges; new-session and compaction events request an early flush. Summaries are
 incremental batches of a session. The harness's compacted context is a separate artifact.
 
-Exchanges remain in the durable Codync queue until processing succeeds. Failures are logged and retried after
+Exchanges remain in the durable Squadbots queue until processing succeeds. Failures are logged and retried after
 five minutes. Explicit memory corrections invalidate prompt snapshots and pending old extraction work;
 in-progress extraction checks a revision before writing. Editing memory sends a correction notice on the
 next agent turn. It cannot remove text already held in a harness's context; start a new session when needed.
@@ -73,7 +73,7 @@ Engram sync IDs and timestamps. It preserves newer changes; importing an older b
 undo a newer deletion. Cross-bot imports remap project/session ownership into the destination's database.
 Engram's JSON format does not include the separate observation revision-history table; old version contents
 are therefore not restored by a JSON import. For a complete local archive including that history, stop the
-host and back up the whole `engram/` directory. Backups larger than 384 KiB use Codync's existing chunked
+host and back up the whole `engram/` directory. Backups larger than 384 KiB use Squadbots's existing chunked
 attachment transport; imports accept up to 100 MiB.
 Retained backups and transfer files are local files, so ordinary host backup/retention policies apply.
 
@@ -84,7 +84,7 @@ and `memoryCall`; agents receive their real ACP session binding, including indep
 ## Verification
 
 `packaging/engram/test-runtime.py` downloads and checksum-verifies the same pinned binary used by the host.
-Set `CODYNC_TEST_ENGRAM` to its output path, then run:
+Set `SQUADBOTS_TEST_ENGRAM` to its output path, then run:
 
 ```sh
 cd host

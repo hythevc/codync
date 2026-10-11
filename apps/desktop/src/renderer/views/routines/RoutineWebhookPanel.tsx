@@ -72,7 +72,7 @@ export function RoutineWebhookPanel({ botId, routineId }: { botId: string; routi
         icon={copied === copy ? 'checkmark' : 'doc.on.doc'}
         onClick={() => {
           if (!webhook) return
-          window.codync.app.copy(copy === 'key' ? webhook.key : (webhook.url ?? webhook.localUrl))
+          window.squadbots.app.copy(copy === 'key' ? webhook.key : (webhook.url ?? webhook.localUrl))
           setCopied(copy)
         }}
       />
@@ -98,8 +98,8 @@ export function RoutineWebhookPanel({ botId, routineId }: { botId: string; routi
           <span style={{ ...caption, color: 'var(--secondary)' }}>
             {webhook.url
               ? 'POST with Authorization: Bearer <key>. For GitHub, use content type application/json and the key as the secret. ' +
-                'Deliveries wait up to 72 hours while this computer is off. They pass through the Codync cloud, which can read them.'
-              : 'The Codync cloud is off, so only this computer can send to it.'}
+                'Deliveries wait up to 72 hours while this computer is off. They pass through the Squadbots cloud, which can read them.'
+              : 'The Squadbots cloud is off, so only this computer can send to it.'}
           </span>
         </>
       ) : error ? (

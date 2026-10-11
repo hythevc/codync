@@ -7,7 +7,7 @@ The bot is the same agent on the computer; the call only changes how you talk to
 
 ## On-device voice
 
-- `apps/ios/Kit/Sources/CodyncUI/Call/` (iPhone) and `apps/desktop/src/renderer/views/call/` (desktop): `CallView` (the call bar) over a `VoiceEngine`; `OnDeviceEngine` is the default audio loop. On the Mac the desktop app runs speech recognition in `codync-speech` (`apps/desktop/native/speech-macos/`, driven by `apps/desktop/src/main/speech.ts`).
+- `apps/ios/Kit/Sources/SquadbotsUI/Call/` (iPhone) and `apps/desktop/src/renderer/views/call/` (desktop): `CallView` (the call bar) over a `VoiceEngine`; `OnDeviceEngine` is the default audio loop. On the Mac the desktop app runs speech recognition in `squadbots-speech` (`apps/desktop/native/speech-macos/`, driven by `apps/desktop/src/main/speech.ts`).
 - UI follows Grok Bot: a floating capsule over the top of the chat (`ThreadView` overlay), and the
   chat stays readable and usable underneath. Left to right: the bot's avatar (pulses while
   speaking; tap it to interrupt), a dotted level line (your voice while listening, a ripple while
@@ -28,7 +28,7 @@ The bot is the same agent on the computer; the call only changes how you talk to
 - Ending the call calls `logCall {botId, seconds}`; the host adds a notice (`callSeconds`) that
   every client shows as "Voice chat · 00:16".
 - The host receives recognized text; the Cloudflare transport sees encrypted channel frames.
-  Codync does not forward microphone audio to the host. Speech recognition may use Apple services
+  Squadbots does not forward microphone audio to the host. Speech recognition may use Apple services
   when on-device recognition is unavailable. `UIBackgroundModes: audio` permits
   background microphone capture and speech playback during an active call.
 - While a call is listening or speaking, it retains the computer's transport across
@@ -48,7 +48,7 @@ store. They do not simulate iOS audio or background scheduling.
 
 On a physical iPhone, start a voice call with a connected bot, return to the Home
 Screen, then speak a request. Verify that it sends successfully and the reply is
-read aloud while Codync remains backgrounded. Also start a long reply in Codync,
+read aloud while Squadbots remains backgrounded. Also start a long reply in Squadbots,
 return Home during playback, and verify that speech continues. End the call and
 confirm that ordinary background notification behavior resumes. For App Review,
 the recording must capture both the physical device and the audible reply.
@@ -63,7 +63,7 @@ Guideline 2.5.4. Record these steps using a connected computer and a bot:
    show the recognized message and the bot's spoken reply.
 3. While a long reply is being read, return to the Home Screen. Keep recording
    long enough to demonstrate audible playback continuing in the background.
-4. Return to Codync and end the call.
+4. Return to Squadbots and end the call.
 
 Ensure the resulting file contains the audible reply. If the screen recorder
 cannot capture the call audio, record the physical phone externally with another
@@ -78,8 +78,8 @@ verify background reply delivery and retirement, not iOS audio behavior.
 ## Realtime voice with your own key
 
 Better recognition (mixed Chinese/English, code terms) and a real conversation (barge-in, "what are
-you doing?" answered from the transcript) need a realtime speech model. Codync is free, so users
-bring their own provider key; Codync never pays for or resells minutes.
+you doing?" answered from the transcript) need a realtime speech model. Squadbots is free, so users
+bring their own provider key; Squadbots never pays for or resells minutes.
 
 ### Engines
 
@@ -133,7 +133,7 @@ shows the provider's name next to the dots whenever audio leaves the device.
 ### Where the key lives
 
 - On the computer, in the host's vault (`host/src/voice.rs`, slot `voice`: encrypted in
-  `codync.db` with the vault key from Keychain / Secret Service), so one key serves the iPhone and the
+  `squadbots.db` with the vault key from Keychain / Secret Service), so one key serves the iPhone and the
   desktop app. It reaches the host once, over the encrypted channel, and never leaves it again; it is never
   logged and never sent to the relay or our cloud.
 - Host methods (control scope): `voiceStatus` (which providers have a key), `setVoiceKey

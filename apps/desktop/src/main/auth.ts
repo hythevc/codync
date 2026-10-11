@@ -2,7 +2,7 @@ import { app, ipcMain, shell } from 'electron'
 import { identity } from './environment'
 
 // Browser sign-ins that come back to this app on a custom scheme (ASWebAuthenticationSession's
-// job on the native apps): connector OAuth (`codync://oauth`) and the account (`com.pokai.Codync://callback`).
+// job on the native apps): connector OAuth (`squadbots://oauth`) and the account (`ai.squadbots.Squadbots://callback`).
 
 export const SCHEMES = [identity.scheme, identity.appId]
 

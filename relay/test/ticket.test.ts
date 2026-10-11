@@ -11,13 +11,13 @@ assert.equal(await openTicket(other, ticket), null);
 assert.equal(await openTicket(env, ticket.slice(0, -2) + "AA"), null);
 console.log("ticket tests ok");
 
-const registration = { token: "ab".repeat(32), env: "sandbox", kind: "alert", bundleId: "com.pokai.Codync.ios.dev" };
+const registration = { token: "ab".repeat(32), env: "sandbox", kind: "alert", bundleId: "ai.squadbots.Squadbots.ios.dev" };
 const response = await worker.fetch(new Request("https://relay.test/register", { method: "POST", body: JSON.stringify(registration) }), env);
 assert.equal(response.status, 200);
 const registered = await response.json() as { ticket: string };
 assert.equal((await openTicket(env, registered.ticket))?.b, registration.bundleId);
-assert.equal(apnsTopic(undefined, "alert"), "com.pokai.Codync.ios");
-assert.equal(apnsTopic(registration.bundleId, "liveactivity"), "com.pokai.Codync.ios.dev.push-type.liveactivity");
+assert.equal(apnsTopic(undefined, "alert"), "ai.squadbots.Squadbots.ios");
+assert.equal(apnsTopic(registration.bundleId, "liveactivity"), "ai.squadbots.Squadbots.ios.dev.push-type.liveactivity");
 assert.throws(() => apnsTopic("another.app", "alert"));
 const invalid = await worker.fetch(new Request("https://relay.test/register", { method: "POST", body: JSON.stringify({ ...registration, bundleId: "another.app" }) }), env);
 assert.equal(invalid.status, 400);

@@ -105,9 +105,9 @@ function GeneralSettings() {
   const [usageIconStyle, setUsageIconStyle] = usePref(prefs.usageIconStyle)
   const [compact, setCompact] = usePref(prefs.sidebarCompact)
   const [showInDock, setShowInDock] = useState(true)
-  useEffect(() => void window.codync.app.showInDock().then(setShowInDock), [])
+  useEffect(() => void window.squadbots.app.showInDock().then(setShowInDock), [])
   const [launchAtLogin, setLaunchAtLogin] = useState(false)
-  useEffect(() => void window.codync.app.launchAtLogin().then(setLaunchAtLogin), [])
+  useEffect(() => void window.squadbots.app.launchAtLogin().then(setLaunchAtLogin), [])
 
   return (
     <CardForm>
@@ -154,8 +154,8 @@ function GeneralSettings() {
         </Switch>
       </CardSection>
       <CardSection title="System">
-        {window.codync.platform === 'darwin' ? <Switch on={showInDock} onChange={(on) => void window.codync.app.setShowInDock(on).then(setShowInDock)}>Show in Dock</Switch> : null}
-        <Switch on={launchAtLogin} onChange={(on) => void window.codync.app.setLaunchAtLogin(on).then(setLaunchAtLogin)}>
+        {window.squadbots.platform === 'darwin' ? <Switch on={showInDock} onChange={(on) => void window.squadbots.app.setShowInDock(on).then(setShowInDock)}>Show in Dock</Switch> : null}
+        <Switch on={launchAtLogin} onChange={(on) => void window.squadbots.app.setLaunchAtLogin(on).then(setLaunchAtLogin)}>
           Open at login
         </Switch>
       </CardSection>
@@ -171,7 +171,7 @@ function PrivacySettings() {
   const running = local !== null && local.connection.kind === 'online'
   const setShared = (on: boolean) => void local?.setAnalytics(on).catch((e: unknown) => app.setError(errorText(e)))
   return (
-    <CardSection title="Privacy" footer="Which features you use, never your messages, code or files. Private, used only to improve Codync.">
+    <CardSection title="Privacy" footer="Which features you use, never your messages, code or files. Private, used only to improve Squadbots.">
       <Switch on={local?.analytics === true} onChange={setShared} disabled={!running}>
         Share usage analytics
       </Switch>
@@ -204,8 +204,8 @@ function UsageLimitsList() {
 function UpdateSettings() {
   const [updates, setUpdates] = useState<UpdateState | null>(null)
   useEffect(() => {
-    void window.codync.updates.state().then(setUpdates)
-    return window.codync.updates.onChange(setUpdates)
+    void window.squadbots.updates.state().then(setUpdates)
+    return window.squadbots.updates.onChange(setUpdates)
   }, [])
   if (!updates) return null
   const footer = !updates.supported
@@ -218,27 +218,27 @@ function UpdateSettings() {
     : null
   return (
     <CardForm>
-      <CardSection title="Codync" footer={footer}>
+      <CardSection title="Squadbots" footer={footer}>
         {[
           <ValueRow key="version" label="Version" detail={lastChecked}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span>{window.codync.appVersion}</span>
-              <Button kind="secondary" onClick={() => window.codync.updates.check()} disabled={!updates.canCheck && !updates.staged}>
+              <span>{window.squadbots.appVersion}</span>
+              <Button kind="secondary" onClick={() => window.squadbots.updates.check()} disabled={!updates.canCheck && !updates.staged}>
                 {updates.availableVersion ? `Update to ${updates.availableVersion}` : 'Check for updates'}
               </Button>
             </span>
           </ValueRow>,
-          <Switch key="check" on={updates.autoCheck} onChange={(on) => window.codync.updates.setAutoCheck(on)} disabled={!updates.supported}>
+          <Switch key="check" on={updates.autoCheck} onChange={(on) => window.squadbots.updates.setAutoCheck(on)} disabled={!updates.supported}>
             Automatically check for updates
           </Switch>,
-          <Switch key="download" on={updates.autoDownload} onChange={(on) => window.codync.updates.setAutoDownload(on)} disabled={!updates.supported}>
+          <Switch key="download" on={updates.autoDownload} onChange={(on) => window.squadbots.updates.setAutoDownload(on)} disabled={!updates.supported}>
             Automatically download and install
           </Switch>,
           ...(updates.error
             ? [
                 <div key="error" className="settings-row settings-appear">
                   <span style={{ flex: 1, color: 'var(--warning)' }}>{updates.error}</span>
-                  <Button kind="secondary" onClick={() => window.codync.updates.check()} disabled={updates.checking}>
+                  <Button kind="secondary" onClick={() => window.squadbots.updates.check()} disabled={updates.checking}>
                     Retry
                   </Button>
                 </div>,

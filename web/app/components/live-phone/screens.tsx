@@ -20,7 +20,7 @@ import { AvatarWithStatus, CharacterAvatar, GroupAvatar, type Face, type Mood } 
 import { clock, palette, paceDiff, swatch, type Chat, type Entry, type Permission } from "./data";
 
 // The iPhone app's two screens at their real size in points (402 x 874), from
-// CodyncUI/Bots/BotRow.swift, Thread/{ChatRows,PermissionCard,Composer}.swift and Chrome.swift.
+// SquadbotsUI/Bots/BotRow.swift, Thread/{ChatRows,PermissionCard,Composer}.swift and Chrome.swift.
 
 export const SCREEN = { w: 402, h: 874 };
 const mono = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';

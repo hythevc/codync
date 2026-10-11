@@ -6,8 +6,8 @@ import { Observable, useModel } from '../../lib/observable'
 import type { AppModel } from '../../store/app-model'
 import { BotStore } from '../../store/bot-store'
 
-/** `window.codync.ssh` (preload/ssh.ts); missing in a build that doesn't wire it. */
-export const sshBridge = (): SSHBridge | null => window.codync.ssh ?? null
+/** `window.squadbots.ssh` (preload/ssh.ts); missing in a build that doesn't wire it. */
+export const sshBridge = (): SSHBridge | null => window.squadbots.ssh ?? null
 
 /** The main process's SSH computers, mirrored for views. */
 class SSHModel extends Observable {

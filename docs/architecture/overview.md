@@ -1,13 +1,13 @@
 # Architecture
 
-Codync keeps agents and their working files on a computer. Clients address that computer's bots; the host owns execution, transcripts and authorization.
+Squadbots keeps agents and their working files on a computer. Clients address that computer's bots; the host owns execution, transcripts and authorization.
 
 ## Runtime paths
 
 ```mermaid
 flowchart LR
     Phone[iPhone] -->|Encrypted WebSocket| Cloud[cloud/ Worker + ComputerRelay DO]
-    Phone -->|Encrypted direct channel| Host[codync-host]
+    Phone -->|Encrypted direct channel| Host[squadbots-host]
     Cloud <-->|Encrypted frames| Host
     Local[Desktop app / TUI] -->|Loopback HTTP + SSE| Host
     SSH[Desktop SSH tunnel] -->|Forwarded loopback HTTP + SSE| Host
@@ -24,7 +24,7 @@ The phone tries direct candidates first, with a 1.5-second connection race, then
 
 | Data | Owner and location |
 |---|---|
-| Bots, chats, replies, revisions, authorized devices | Host SQLite in its data directory (`~/.codync` by default; `CODYNC_HOME` overrides it) |
+| Bots, chats, replies, revisions, authorized devices | Host SQLite in its data directory (`~/.squadbots` by default; `SQUADBOTS_HOME` overrides it) |
 | Host signing and mailbox keys | `identity.json`, separate from SQLite |
 | Loopback API bearer token | Host `token` file |
 | Agent context and provider credentials | Coding harness on that computer |
@@ -64,4 +64,4 @@ Remote screen uses the channel for signaling and WebRTC for media/input. Cloudfl
 
 Client/host compatibility uses mutual minimum versions (`minApp` / `minHost`, see [compatibility](../reference/compatibility.md)). The channel wire version (`v=1`), pairing URL version (`v=3`) and the cloud health endpoint's service version are separate values.
 
-Debug iOS builds use `apps/shared/Config/dev.plist`; Release uses `main.plist`. The desktop app takes the same values through `apps/desktop/tools/account-config.mjs`. The host compiles in its cloud from `CODYNC_ENV` (`main`, else dev), set by the same packaging script (`dist:mac:dev` / `dist:mac:main`). Production fields are currently incomplete in checked-in configuration, so a successful Debug install is not production readiness. See [environments](../guides/environments-and-deployment.md).
+Debug iOS builds use `apps/shared/Config/dev.plist`; Release uses `main.plist`. The desktop app takes the same values through `apps/desktop/tools/account-config.mjs`. The host compiles in its cloud from `SQUADBOTS_ENV` (`main`, else dev), set by the same packaging script (`dist:mac:dev` / `dist:mac:main`). Production fields are currently incomplete in checked-in configuration, so a successful Debug install is not production readiness. See [environments](../guides/environments-and-deployment.md).

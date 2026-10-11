@@ -14,7 +14,7 @@ Rules every change follows, in every part of the repository (host, iOS, desktop,
 - **Don't grow a large file.** New behavior in a file past ~500 lines goes into a new sibling module (Rust submodule, Swift extension file, React component/hook), not appended to it. When a change already touches a large file, move the part you are changing out first, as its own `refactor` commit.
 - **Layers stay in their lane.** Views render state and send intents; stores/models own state and logic; clients/transports own I/O. No networking, persistence or parsing in a SwiftUI view or React component. In the host, keep protocol parsing, decisions and side effects (db, process, network) apart so the decision part is a pure, unit-testable function.
 - **Small public surface.** Default to `private`/`fileprivate`, `pub(crate)` or no export; widen only when another module needs it.
-- **Dependencies point one way.** `CodyncKit` never imports `CodyncUI`; renderer code reaches the host only through `window.codync`; shared code never knows about a specific screen.
+- **Dependencies point one way.** `SquadbotsKit` never imports `SquadbotsUI`; renderer code reaches the host only through `window.squadbots`; shared code never knows about a specific screen.
 
 ## Functions and types
 

@@ -7,9 +7,9 @@ import { authenticate } from './auth'
 import { buildConfig, identity } from './environment'
 
 /**
- * The Codync account through Clerk's Frontend API, the way ClerkKit drives it on the native
+ * The Squadbots account through Clerk's Frontend API, the way ClerkKit drives it on the native
  * apps: a device token in the `Authorization` header (`_is_native=true`), OAuth in the system
- * browser returning to `com.pokai.Codync://callback`, the token kept encrypted with the OS
+ * browser returning to `ai.squadbots.Squadbots://callback`, the token kept encrypted with the OS
  * keychain. An account never grants access to a computer by itself (spec §4.2).
  */
 
@@ -23,11 +23,11 @@ interface Config {
 
 export const isMainEnvironment = () => identity.releaseUpdates
 
-/** `CODYNC_CLERK_PUBLISHABLE_KEY` / `CODYNC_CLOUD_URL`, else the build's account config. */
+/** `SQUADBOTS_CLERK_PUBLISHABLE_KEY` / `SQUADBOTS_CLOUD_URL`, else the build's account config. */
 function loadConfig(): Config {
   const file = buildConfig
-  const key = (process.env.CODYNC_CLERK_PUBLISHABLE_KEY ?? file.clerkPublishableKey ?? '').trim()
-  const cloud = (process.env.CODYNC_CLOUD_URL ?? file.cloudURL ?? '').trim()
+  const key = (process.env.SQUADBOTS_CLERK_PUBLISHABLE_KEY ?? file.clerkPublishableKey ?? '').trim()
+  const cloud = (process.env.SQUADBOTS_CLOUD_URL ?? file.cloudURL ?? '').trim()
   return {
     clerkPublishableKey: key.startsWith('pk_test_') || key.startsWith('pk_live_') ? key : null,
     cloudURL: /^https:\/\//.test(cloud) ? cloud.replace(/\/$/, '') : null,
@@ -245,7 +245,7 @@ export class AccountService extends EventEmitter {
     this.applyClient(null)
   }
 
-  /** The signed-in session's JWT for the Codync cloud (cached for under a minute, like Clerk). */
+  /** The signed-in session's JWT for the Squadbots cloud (cached for under a minute, like Clerk). */
   async sessionToken(): Promise<string> {
     const session = this.activeSession
     if (!session) throw new Error('Sign in again to reach your account.')

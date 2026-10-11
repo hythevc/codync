@@ -15,7 +15,7 @@ Files travel in both directions: users attach inputs, and bots explicitly share 
   of order is refused. Then `send {…, attachments: [uploadId]}`; the text may be empty.
 - Storage (`host/src/chat/uploads.rs`): `<workspace>/uploads/<uploadId>/<name>` for a personal
   workspace (so reading needs no extra approval), otherwise
-  `~/.codync/bots/<bot>/uploads/<uploadId>/<name>`. Only UUID ids and plain file names are accepted.
+  `~/.squadbots/bots/<bot>/uploads/<uploadId>/<name>`. Only UUID ids and plain file names are accepted.
 - The agent gets the message text plus an "Attached files" list of absolute paths and reads them with
   its own tools (Claude and Codex read images too). The entry keeps `attachments: [{id, name, size}]`
   for display.
@@ -39,7 +39,7 @@ accepted, including binary, hidden, extensionless and empty files, up to 100 MiB
 Directories and special files are refused. Group, routine and delegated turns cannot
 publish files.
 
-The host streams a snapshot into `~/.codync/bots/<bot>/files/<fileId>` and records
+The host streams a snapshot into `~/.squadbots/bots/<bot>/files/<fileId>` and records
 its byte size and SHA-256 before publishing a final agent entry with
 `files: [{id, name, size, sha256}]`. Copying runs outside the bot actor; Stop,
 reconfiguration, timeout and turn completion cancel unpublished copies. A success

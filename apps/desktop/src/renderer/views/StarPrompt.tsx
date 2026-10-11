@@ -8,16 +8,16 @@ import { prefs, usePref } from '../lib/prefs'
 import { afterStarAsk, dueStarAsk } from '../lib/star-ask'
 import { useApp } from '../store/context'
 
-const REPO = 'https://github.com/leepokai/Codync'
+const REPO = 'https://github.com/jaimedhenriques/squadbots'
 
 const copy = {
   first: {
-    title: 'Star Codync on GitHub',
-    message: 'Codync is free and open source. A star on GitHub is how other people find it.',
+    title: 'Star Squadbots on GitHub',
+    message: 'Squadbots is free and open source. A star on GitHub is how other people find it.',
   },
   second: {
-    title: 'Enjoying Codync?',
-    message: "You've been using Codync for a while. If it saves you trips to your desk, a star on GitHub helps other people find it.",
+    title: 'Enjoying Squadbots?',
+    message: "You've been using Squadbots for a while. If it saves you trips to your desk, a star on GitHub helps other people find it.",
   },
 }
 
@@ -38,7 +38,7 @@ export function StarPrompt() {
     if (closed) return
     setClosed(true)
     setState(afterStarAsk(state, starred, Date.now()))
-    if (starred) window.codync.app.openExternal(REPO)
+    if (starred) window.squadbots.app.openExternal(REPO)
   }
 
   const text = copy[due ?? 'first']

@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import SquadbotsKit
+import SquadbotsUI
 import SwiftUI
 import WidgetKit
 
@@ -42,7 +42,7 @@ struct WidgetGalleryView: View {
                         .frame(width: 58, height: 58)
                         .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Codync, at a glance.")
+                        Text("Squadbots, at a glance.")
                             .font(.title3.weight(.semibold)).tracking(-0.4)
                         Text("Your bots and usage, on every surface.")
                             .font(.footnote).foregroundStyle(Palette.secondary)
@@ -57,7 +57,7 @@ struct WidgetGalleryView: View {
                     VStack(spacing: 0) {
                         setupRow("Connect a computer", complete: !accounts.computers.isEmpty)
                         Rectangle().fill(Palette.border).frame(height: 0.5).padding(.leading, 42)
-                        setupRow("Add a Codync widget", complete: hasWidget == true,
+                        setupRow("Add a Squadbots widget", complete: hasWidget == true,
                                  status: hasWidget == nil ? (widgetCheckFailed ? "Unable to check" : "Checking") : nil)
                         Rectangle().fill(Palette.border).frame(height: 0.5).padding(.leading, 42)
                         Button(action: turnOnNotifications) {
@@ -118,7 +118,7 @@ struct WidgetGalleryView: View {
                     sectionLabel("Choose the look")
                     SegmentedChoice(selection: Binding(
                         get: { usageIconStyle },
-                        set: { usageIconStyle = $0; WidgetCenter.shared.reloadTimelines(ofKind: "CodyncProviderUsage") }
+                        set: { usageIconStyle = $0; WidgetCenter.shared.reloadTimelines(ofKind: "SquadbotsProviderUsage") }
                     ), options: [(UsageIconStyle.character.rawValue, "Character"), (UsageIconStyle.original.rawValue, "Original icon")])
                     Text("Applies to Usage on iPhone and in the Mac menu bar.")
                         .font(.caption).foregroundStyle(Palette.secondary)
@@ -138,7 +138,7 @@ struct WidgetGalleryView: View {
                     sectionLabel("Add a widget")
                     WidgetSetupDemo()
                 }
-                Text("Widgets show the latest report. Open Codync for live updates and approvals.")
+                Text("Widgets show the latest report. Open Squadbots for live updates and approvals.")
                     .font(.caption2).foregroundStyle(Palette.tertiary)
             }
             .padding(18)
@@ -234,7 +234,7 @@ struct WidgetGalleryView: View {
         let animation = Motion.reduced(Motion.layout, reduceMotion)
         withAnimation(animation) { widgetCheckFailed = false }
         WidgetCenter.shared.getCurrentConfigurations { result in
-            let installed = (try? result.get())?.contains { $0.kind.hasPrefix("Codync") }
+            let installed = (try? result.get())?.contains { $0.kind.hasPrefix("Squadbots") }
             Task { @MainActor in
                 withAnimation(animation) {
                     hasWidget = installed

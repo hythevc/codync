@@ -46,7 +46,7 @@ export default function Hero() {
             {/* eslint-disable-next-line @next/next/no-img-element -- live badge served by Product Hunt */}
             <img
               src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1267264&theme=dark"
-              alt="Codync on Product Hunt"
+              alt="Squadbots on Product Hunt"
               width={250}
               height={54}
               className="h-10 w-auto"
@@ -72,7 +72,7 @@ export default function Hero() {
               <span className="inline-flex size-[0.95em] items-center justify-center rounded-[0.24em] bg-neutral-50 [&_svg]:size-[78%]">
                 <CharacterAvatar shape="squircle" color="blue" size={88} mood="working" />
               </span>
-              Codync
+              Squadbots
             </motion.h1>
 
             <motion.p {...rise(0.1)} className="mt-8 max-w-[36rem] text-lg leading-relaxed text-neutral-400">
@@ -126,7 +126,7 @@ export default function Hero() {
           className="relative mx-auto mt-16 max-w-6xl scroll-mt-24 md:mt-20"
         >
           <MediaLabel label="Live demo">
-            The real Codync desktop app, running in your browser. Click a bot, open a room, send a message.
+            The real Squadbots desktop app, running in your browser. Click a bot, open a room, send a message.
           </MediaLabel>
           <MacWindow />
         </motion.div>

@@ -284,7 +284,7 @@ mod tests {
     fn history_search_matches_every_term_in_chat_messages() {
         let s = temp_store();
         let main = Lane::main("b1");
-        s.insert_entry(&main, EntryKind::User, 1, &json!({"text": "我們用 Swift 6 寫 Codync"})).unwrap();
+        s.insert_entry(&main, EntryKind::User, 1, &json!({"text": "我們用 Swift 6 寫 Squadbots"})).unwrap();
         s.insert_entry(&main, EntryKind::Agent, 1, &json!({"text": "swift narration", "final": false})).unwrap();
         s.insert_entry(&main, EntryKind::Agent, 1, &json!({"text": "Swift 6 strict mode is on", "final": true}))
             .unwrap();
@@ -297,8 +297,8 @@ mod tests {
                 .map(|e| e.data["text"].as_str().unwrap().to_owned())
                 .collect()
         };
-        assert_eq!(texts(&["SWIFT", "6"]), ["Swift 6 strict mode is on", "我們用 Swift 6 寫 Codync"]);
-        assert_eq!(texts(&["codync", "寫"]), ["我們用 Swift 6 寫 Codync"]);
+        assert_eq!(texts(&["SWIFT", "6"]), ["Swift 6 strict mode is on", "我們用 Swift 6 寫 Squadbots"]);
+        assert_eq!(texts(&["squadbots", "寫"]), ["我們用 Swift 6 寫 Squadbots"]);
         assert_eq!(texts(&["narration"]).len(), 0);
     }
 

@@ -28,7 +28,7 @@ export function validate(p: SSHProfile): string | null {
   if (p.user !== null && !/^[A-Za-z_][A-Za-z0-9._-]*$/.test(p.user)) return "That user name isn't valid."
   const inRange = (n: number) => Number.isInteger(n) && n >= 1 && n <= 65535
   if (p.port !== null && !inRange(p.port)) return 'The SSH port must be between 1 and 65535.'
-  if (!inRange(p.remotePort)) return 'The Codync port must be between 1 and 65535.'
+  if (!inRange(p.remotePort)) return 'The Squadbots port must be between 1 and 65535.'
   if (p.identityFile !== null) {
     let ok = false
     try {
@@ -133,7 +133,7 @@ function run(bin: string, args: string[], input?: string): Promise<Result> {
   })
 }
 
-/** Tunnels a crashed or force-quit Codync left running: only Codync's tunnels carry this known_hosts file. */
+/** Tunnels a crashed or force-quit Squadbots left running: only Squadbots's tunnels carry this known_hosts file. */
 const killOrphanTunnels = () => run('/usr/bin/pkill', ['-f', '--', `^/usr/bin/ssh -N .*\\${identity.dataFolder}/ssh_known_hosts`])
 
 /** Binds port 0 on loopback to learn a free port. */
@@ -183,7 +183,7 @@ async function healthOf(baseURL: string): Promise<{ computerId?: string } | null
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** What `codync-host info --json` prints. */
+/** What `squadbots-host info --json` prints. */
 interface RemoteInfo {
   name: string
   computerId: string
@@ -212,7 +212,7 @@ interface Token {
 }
 
 const signInRefused = (p: SSHProfile) =>
-  `${p.host} refused the key. Codync signs in with an SSH key (ssh-agent or the key file) and can't type a password or passphrase; make \`ssh ${p.host}\` work in Terminal without prompting, then connect again.`
+  `${p.host} refused the key. Squadbots signs in with an SSH key (ssh-agent or the key file) and can't type a password or passphrase; make \`ssh ${p.host}\` work in Terminal without prompting, then connect again.`
 
 class SSHComputers {
   profiles: SSHProfile[] = []
@@ -297,7 +297,7 @@ class SSHComputers {
     for (const id of new Set([...this.tunnels.keys(), ...this.tasks.keys()])) this.disconnect(id)
   }
 
-  /** The user compared the fingerprints: remember the key in Codync's known_hosts and go on. */
+  /** The user compared the fingerprints: remember the key in Squadbots's known_hosts and go on. */
   async trustHostKey(id: string) {
     const lines = this.pendingKeys.get(id)
     if (this.status.get(id)?.kind !== 'confirmHostKey' || !lines) return
@@ -379,7 +379,7 @@ class SSHComputers {
         // Only plain host keys can be compared: a `@cert-authority` key is never what keyscan returns.
         const pinned = await this.recordedKeys(name, false)
         if (current.size > 0 && pinned.size > 0 && ![...current].some((k) => pinned.has(k))) {
-          return stop({ kind: 'failed', message: `The host key of ${profile.host} changed. This can mean someone is intercepting the connection. Codync won't connect until the old key is removed from known_hosts.` })
+          return stop({ kind: 'failed', message: `The host key of ${profile.host} changed. This can mean someone is intercepting the connection. Squadbots won't connect until the old key is removed from known_hosts.` })
         }
       }
       return { kind: 'retry', message: `SSH couldn't connect to ${profile.host}. ${lastLine(result.stderr)}` }
@@ -388,14 +388,14 @@ class SSHComputers {
     const info = parseInfo(result.stdout)
     if (!info) {
       if (result.status === 0) return stop({ kind: 'notInstalled' })
-      return stop({ kind: 'failed', message: `codync-host on ${profile.host} couldn't report its identity. Run \`codync-host install\` there. ${lastLine(result.stderr)}` })
+      return stop({ kind: 'failed', message: `squadbots-host on ${profile.host} couldn't report its identity. Run \`squadbots-host install\` there. ${lastLine(result.stderr)}` })
     }
     if (!consistent(info.computerId, info.signKey)) return stop({ kind: 'failed', message: `${profile.host} reported an invalid identity.` })
     if (profile.computerId && profile.computerId !== info.computerId) {
       return stop({ kind: 'failed', message: `${profile.host} is now a different computer than the one saved. If it was reinstalled, remove it and add it again.` })
     }
     if (!profile.computerId) this.remember(id, info.computerId, info.name)
-    if (!info.running) return { kind: 'retry', message: `codync-host is installed on ${info.name} but not running. Run \`codync-host install\` there.` }
+    if (!info.running) return { kind: 'retry', message: `squadbots-host is installed on ${info.name} but not running. Run \`squadbots-host install\` there.` }
 
     // Tunnel: a free loopback port each attempt; a port taken in between just makes ssh exit (ExitOnForwardFailure).
     let lastProblem = ''

@@ -188,7 +188,7 @@ describe("Codync-Sig", () => {
     const value = r.header.slice("Codync-Sig: ".length);
     // Upper-case Host is the same authority; a different host is not.
     expect(await verifySig(req({ "Codync-Sig": value }, r.authority.toUpperCase()), new Uint8Array(), r.ts)).not.toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value }, "codync-cloud.example.workers.dev"), new Uint8Array(), r.ts)).toBeNull();
+    expect(await verifySig(req({ "Codync-Sig": value }, "squadbots-cloud.example.workers.dev"), new Uint8Array(), r.ts)).toBeNull();
     expect(await verifySig(req({ "Codync-Sig": value }, r.authority, `${r.pathAndQuery}&pair=x`), new Uint8Array(), r.ts)).toBeNull();
     expect(await verifySig(req({ "Codync-Sig": value }), new Uint8Array([1]), r.ts)).toBeNull();
     expect(await verifySig(req({ "Codync-Sig": value.replace("v=1", "v=2") }), new Uint8Array(), r.ts)).toBeNull();

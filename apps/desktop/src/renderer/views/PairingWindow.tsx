@@ -38,7 +38,7 @@ export function PairingWindow() {
   // A new code each time "Pair iPhone…" is chosen (the window stays open between uses)…
   useEffect(() => {
     void load()
-    return window.codync.app.onCommand((c) => c.kind === 'reviewApprovals' && void load())
+    return window.squadbots.app.onCommand((c) => c.kind === 'reviewApprovals' && void load())
   }, [load])
 
   // …and a fresh one when this code expires while it's on screen.
@@ -56,7 +56,7 @@ export function PairingWindow() {
             <img src={qr} alt={`Pairing code for ${name}`} width={200} height={200} style={{ display: 'block', imageRendering: 'pixelated' }} />
           </div>
           <div style={{ ...font('caption'), color: 'var(--secondary)', textAlign: 'center' }}>
-            Scan with the Codync app or the iPhone Camera. No Tailscale or open ports needed: your iPhone connects directly on the same Wi-Fi, and through the encrypted relay anywhere else.
+            Scan with the Squadbots app or the iPhone Camera. No Tailscale or open ports needed: your iPhone connects directly on the same Wi-Fi, and through the encrypted relay anywhere else.
           </div>
           {cloud?.enabled !== true ? (
             <div style={{ ...font('caption'), color: 'var(--warning)', textAlign: 'center' }}>
@@ -72,7 +72,7 @@ export function PairingWindow() {
               </span>
             ) : null}
             <IconButton title="New code" icon="arrow.clockwise" onClick={() => void load()} />
-            <IconButton title="Copy pairing link" icon="doc.on.doc" onClick={() => window.codync.app.copy(info.pairingUrl)} />
+            <IconButton title="Copy pairing link" icon="doc.on.doc" onClick={() => window.squadbots.app.copy(info.pairingUrl)} />
           </div>
         </>
       ) : error ? (

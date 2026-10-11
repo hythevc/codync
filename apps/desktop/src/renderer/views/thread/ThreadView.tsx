@@ -84,7 +84,7 @@ export function ThreadView({ botId }: { botId: string }) {
 
   useEffect(
     () =>
-      window.codync.app.onCommand((c) => {
+      window.squadbots.app.onCommand((c) => {
         if (c.kind === 'toggleDetails') toggleDetails()
       }),
     [toggleDetails],

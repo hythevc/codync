@@ -5,7 +5,7 @@ address, Apple login or transport. Pairing and account discovery of the same hos
 reuse that ID; iOS keeps one store per ID. Different computers may have the same
 name without being merged. Resetting the host's data/keys makes a new identity:
 its old offline entry may need removing. Signing in with Apple and Google shares
-this state only when both reach the same Codync account.
+this state only when both reach the same Squadbots account.
 
 Desktop and iOS show one section per selected computer, or a flat list when only
 one is selected. Drag a section heading to reorder it. Desktop also supports

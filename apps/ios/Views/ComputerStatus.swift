@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import SquadbotsKit
+import SquadbotsUI
 import SwiftUI
 
 extension BotStore {

@@ -1,7 +1,7 @@
 // Builds the host the app bundles for the same environment as the app: node tools/native-host.mjs
-// dev|main compiles it in as CODYNC_ENV. Built on every package so a host made for another
-// environment is never shipped. macOS: build/native/codync-host (universal). Windows:
-// build/native/codync-host.exe and codync-hostw.exe (runs it at sign-in), plus the computer-use
+// dev|main compiles it in as SQUADBOTS_ENV. Built on every package so a host made for another
+// environment is never shipped. macOS: build/native/squadbots-host (universal). Windows:
+// build/native/squadbots-host.exe and squadbots-hostw.exe (runs it at sign-in), plus the computer-use
 // driver the host starts from beside itself. Linux apps use the installed host, so there's
 // nothing to do there.
 import { copyFileSync, mkdirSync } from 'node:fs'
@@ -19,17 +19,17 @@ const out = join(root, 'build/native')
 // comes first on PATH: only rustup's has the x86_64 target.
 const tool = (name) => execFileSync('rustup', ['which', name], { cwd: host, encoding: 'utf8' }).trim()
 const [cargo, rustc] = [tool('cargo'), tool('rustc')]
-const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit', env: { ...process.env, CODYNC_ENV: env, RUSTC: rustc } })
+const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit', env: { ...process.env, SQUADBOTS_ENV: env, RUSTC: rustc } })
 const build = (target) => run(cargo, ['build', '--release', '--manifest-path', join(host, 'Cargo.toml'), '--target', target])
 mkdirSync(out, { recursive: true })
 if (process.platform === 'win32') {
   const target = 'x86_64-pc-windows-msvc'
   build(target)
-  for (const exe of ['codync-host.exe', 'codync-hostw.exe']) copyFileSync(join(host, 'target', target, 'release', exe), join(out, env === 'dev' && exe === 'codync-hostw.exe' ? 'codync-dev-hostw.exe' : exe))
+  for (const exe of ['squadbots-host.exe', 'squadbots-hostw.exe']) copyFileSync(join(host, 'target', target, 'release', exe), join(out, env === 'dev' && exe === 'squadbots-hostw.exe' ? 'squadbots-dev-hostw.exe' : exe))
   run(process.execPath, [join(root, '../../packaging/cua-driver/fetch.mjs'), 'windows-x86_64', out])
 } else {
   const targets = ['aarch64-apple-darwin', 'x86_64-apple-darwin']
   for (const target of targets) build(target)
-  run('lipo', ['-create', '-output', join(out, 'codync-host'), ...targets.map((t) => join(host, 'target', t, 'release/codync-host'))])
+  run('lipo', ['-create', '-output', join(out, 'squadbots-host'), ...targets.map((t) => join(host, 'target', t, 'release/squadbots-host'))])
 }
 console.log(`host: ${env}`)

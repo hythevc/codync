@@ -24,4 +24,4 @@ jobs:
       - name: Test on an iPhone simulator
         run: |
           DEVICE=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [^(]+\(([0-9A-F-]{36})\)' | grep -oE '[0-9A-F-]{36}')
-          xcodebuild test -scheme CodyncKit-Package -destination "platform=iOS Simulator,id=$DEVICE" -quiet
+          xcodebuild test -scheme SquadbotsKit-Package -destination "platform=iOS Simulator,id=$DEVICE" -quiet

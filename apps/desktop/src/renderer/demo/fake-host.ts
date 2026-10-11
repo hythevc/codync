@@ -2,13 +2,13 @@ import type { CallError } from '@shared/ipc'
 import { isChat, normalizeBot, type Bot, type BotDraft, type Entry, type GroupDraft } from '@shared/models'
 import * as story from './story'
 
-// An in-memory codync-host for the website demo: the methods the renderer calls, with the
+// An in-memory squadbots-host for the website demo: the methods the renderer calls, with the
 // host's JSON shapes (host/src/api/), and the events stream (hello, then catch-up in rev
 // order, then live). Every mutation stamps a global rev, like the real host.
 
 const TYPING_MS = 1500
 
-export const DEMO_UNAVAILABLE = 'Not available in the web demo. Install Codync to use this.'
+export const DEMO_UNAVAILABLE = 'Not available in the web demo. Install Squadbots to use this.'
 
 export class FakeHost {
   readonly hostId = 'demo-host'

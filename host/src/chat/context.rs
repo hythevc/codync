@@ -130,7 +130,7 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
     // servers, tool descriptions) explain the tool, so they aren't repeated here.
     lines.push(String::new());
     lines.push(
-        "You are a persistent agent the user delegates work to through Codync, from their phone or computer."
+        "You are a persistent agent the user delegates work to through Squadbots, from their phone or computer."
             .to_owned(),
     );
     lines.push(String::new());
@@ -141,7 +141,7 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
             .to_owned(),
     );
     lines.push(String::new());
-    lines.push(format!("Workspace: your default working directory is {}. {} Keep your own files and outputs there. For another project, use explicit paths or change directory for that command; don't change your bot configuration to work elsewhere. This directory is not a sandbox or a grant of access: follow the user's instructions and your permissions, and don't assume other bots' files are yours.", cfg.cwd, if crate::agent::workspace::is_managed(cfg) { "Codync allocated it for you alone." } else { "The user chose this project folder." }));
+    lines.push(format!("Workspace: your default working directory is {}. {} Keep your own files and outputs there. For another project, use explicit paths or change directory for that command; don't change your bot configuration to work elsewhere. This directory is not a sandbox or a grant of access: follow the user's instructions and your permissions, and don't assume other bots' files are yours.", cfg.cwd, if crate::agent::workspace::is_managed(cfg) { "Squadbots allocated it for you alone." } else { "The user chose this project folder." }));
     if let Some(skills) = crate::market::skills_brief(store, &cfg.skills) {
         lines.push(String::new());
         lines.push(skills);
@@ -208,7 +208,7 @@ mod tests {
     }
 
     fn store() -> Store {
-        let path = std::env::temp_dir().join(format!("codync-context-{}.db", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!("squadbots-context-{}.db", uuid::Uuid::new_v4()));
         Store::open(&path).expect("temp store")
     }
 

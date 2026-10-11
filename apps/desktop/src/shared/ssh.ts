@@ -41,7 +41,7 @@ export interface SSHState {
   attachments: SSHAttachment[]
 }
 
-export const SSH_INSTALL_COMMAND = 'brew install leepokai/codync/codync-host && codync-host install'
+export const SSH_INSTALL_COMMAND = 'brew install jaimedhenriques/squadbots/squadbots-host && squadbots-host install'
 
 export const newSSHProfile = (remotePort = 19222): SSHProfile => ({
   id: crypto.randomUUID(),

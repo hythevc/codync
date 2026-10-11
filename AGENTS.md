@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 
 - `host/`: Rust daemon, ACP integration, SQLite storage, HTTP/SSE API, and terminal UI; unit tests live alongside modules in `src/`.
-- `apps/ios/`: iPhone app (SwiftUI); widgets live in `apps/ios/Widgets/`. `apps/ios/Kit/` is its Swift package: `CodyncKit` (models, clients, design primitives) and `CodyncUI` (screens and stores); tests in `apps/ios/Kit/Tests/CodyncKitTests/`.
+- `apps/ios/`: iPhone app (SwiftUI); widgets live in `apps/ios/Widgets/`. `apps/ios/Kit/` is its Swift package: `SquadbotsKit` (models, clients, design primitives) and `SquadbotsUI` (screens and stores); tests in `apps/ios/Kit/Tests/SquadbotsKitTests/`.
 - `apps/desktop/`: desktop app for macOS, Linux and Windows (Electron, React, TypeScript): [docs/architecture/desktop-app.md](docs/architecture/desktop-app.md).
 - `apps/screen-macos` and `apps/screen-linux`: Remote screen helpers.
 - `cloud/`: Cloudflare accounts, encrypted relay, Durable Objects and D1; tests live in `cloud/test/`.
@@ -13,12 +13,12 @@
 
 Run from the repository root unless a command changes directories:
 
-- `xcodegen generate --spec apps/project.yml`: regenerate `apps/Codync.xcodeproj` after editing `apps/project.yml`; never edit `project.pbxproj` directly.
+- `xcodegen generate --spec apps/project.yml`: regenerate `apps/Squadbots.xcodeproj` after editing `apps/project.yml`; never edit `project.pbxproj` directly.
 - Use Xcode’s `iOS Dev` scheme for development and `iOS` for production; see [Dev app isolation](docs/guides/dev-app.md).
 - `cd apps/desktop && npm ci && npm run dev`: run the desktop app; `npm run typecheck && npm test` for its CI checks.
 - `cd host && cargo build`: build the host; `cargo run -- serve` starts it in the foreground.
 - `cd host && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`: run host CI checks.
-- `cd apps/ios/Kit && xcodebuild test -scheme CodyncKit-Package -destination 'platform=iOS Simulator,name=<any iPhone>'`: run the iPhone package tests.
+- `cd apps/ios/Kit && xcodebuild test -scheme SquadbotsKit-Package -destination 'platform=iOS Simulator,name=<any iPhone>'`: run the iPhone package tests.
 - `cd cloud && npm ci && npm test && npm run typecheck`: validate the cloud service; see `docs/guides/cloudflare-testing.md` for integration checks.
 - `cd relay && npm ci && npm test && npm run typecheck`: install dependencies and validate the relay.
 
@@ -26,7 +26,7 @@ Run from the repository root unless a command changes directories:
 
 Always stop the old desktop app, host and iPhone process for the variant being rebuilt before running a new build (old host = old protocol, old app = old UI); commands in [docs/guides/development.md](docs/guides/development.md#apple-apps).
 
-Keep only the latest build: in this checkout, Apple builds go to `build/dd` only (no other `-derivedDataPath`, no copies in scratchpads, `/tmp` or Xcode's DerivedData); delete any older Codync build right away, so macOS never launches a stale copy. A git worktree may keep its own single build inside that worktree.
+Keep only the latest build: in this checkout, Apple builds go to `build/dd` only (no other `-derivedDataPath`, no copies in scratchpads, `/tmp` or Xcode's DerivedData); delete any older Squadbots build right away, so macOS never launches a stale copy. A git worktree may keep its own single build inside that worktree.
 
 ## Versioning & releases
 
@@ -41,7 +41,7 @@ Use four-space indentation for Swift and Rust, two spaces for TypeScript. Follow
 
 Name Swift files after their main `UpperCamelCase` type; use `snake_case.rs` and `kebab-case.ts`. Follow role suffixes such as `View`, `Row`, and `Store`. See `docs/architecture/file-structure.md` and `CLAUDE.md` for architectural conventions.
 
-- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation for system Liquid Glass, as specified in `docs/design/ui-conventions.md`. The desktop app's menu bar/tray menu is the system menu. Keep system authentication and widget containers native. On iOS `.codyncSheet` presents the system sheet (grabber, swipe down). Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `TabView`, `ContentUnavailableView`. Use `apps/ios/Kit/Sources/CodyncUI/Controls.swift` + `Chrome.swift` (`.codyncSheet`, `ModalHeader`, `ScreenHeader`, `TabBar`, `.codyncDialog`, `ToggleStyle.codync`); on the desktop, `apps/desktop/src/renderer/components/` (`Sheet`, `Dialog`, `AnchoredMenu`, `ModalHeader`, `Controls.tsx`, `Icon` for SF Symbols). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
+- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation for system Liquid Glass, as specified in `docs/design/ui-conventions.md`. The desktop app's menu bar/tray menu is the system menu. Keep system authentication and widget containers native. On iOS `.squadbotsSheet` presents the system sheet (grabber, swipe down). Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `TabView`, `ContentUnavailableView`. Use `apps/ios/Kit/Sources/SquadbotsUI/Controls.swift` + `Chrome.swift` (`.squadbotsSheet`, `ModalHeader`, `ScreenHeader`, `TabBar`, `.squadbotsDialog`, `ToggleStyle.squadbots`); on the desktop, `apps/desktop/src/renderer/components/` (`Sheet`, `Dialog`, `AnchoredMenu`, `ModalHeader`, `Controls.tsx`, `Icon` for SF Symbols). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
 
 ## Clean code
 
@@ -49,11 +49,11 @@ Name Swift files after their main `UpperCamelCase` type; use `snake_case.rs` and
 
 ## Cross-platform UI changes
 
-- Any UI change in any client must include the corresponding updates to the other clients in the same change: iOS (`apps/ios/`, `apps/ios/Kit/Sources/CodyncUI/`), desktop (`apps/desktop/src/renderer/`, macOS, Linux and Windows), and terminal UI (`host/src/tui/`). This applies in every direction.
+- Any UI change in any client must include the corresponding updates to the other clients in the same change: iOS (`apps/ios/`, `apps/ios/Kit/Sources/SquadbotsUI/`), desktop (`apps/desktop/src/renderer/`, macOS, Linux and Windows), and terminal UI (`host/src/tui/`). This applies in every direction.
 - Keep shared features, actions, terminology, displayed information, and loading, empty, error, and permission states consistent. Adapt layout, controls, and input to each platform, including terminal keyboard interaction, while preserving the same user-facing behavior.
 - Inspect every client's corresponding implementation before finishing a UI task. Implement applicable changes together; do not silently defer another client. For a platform-only change or an unsupported capability, document which clients are unaffected and the concrete reason in the change summary.
 - Validate each affected client with its relevant build/tests and UI checks. Report any checks that could not run and why.
-- The desktop app is one codebase for macOS, Linux and Windows: platform differences go through `window.codync.platform` checks or the main process, never a fork of a view.
+- The desktop app is one codebase for macOS, Linux and Windows: platform differences go through `window.squadbots.platform` checks or the main process, never a fork of a view.
 
 ## Testing Guidelines
 

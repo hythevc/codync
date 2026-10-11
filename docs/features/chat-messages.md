@@ -4,7 +4,7 @@ How a bot's work turns into what the user reads, copied from Grok Bot.
 
 ## Messages are sent, not streamed
 
-- Every bot gets the built-in `chat` MCP server (`codync-host mcp chat`,
+- Every bot gets the built-in `chat` MCP server (`squadbots-host mcp chat`,
   `host/src/chat/outbox.rs`) with `send_message {text}` and `send_file {path, name?}`. In the bot's own chat and its
   threads, each call is one chat bubble, added to the turn's lane at once as an `agent` entry with
   `final: true`. A turn can send several.

@@ -135,7 +135,7 @@ impl Portal {
     pub fn status(&self) -> Value {
         json!({
             "platform": "linux",
-            "permissionApp": "Codync Screen",
+            "permissionApp": "Squadbots Screen",
             "version": env!("CARGO_PKG_VERSION"),
             "capture": self.is_active(),
             "input": self.has_input(),

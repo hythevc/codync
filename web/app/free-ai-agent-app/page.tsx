@@ -13,7 +13,7 @@ import { DMG, WINDOWS } from "../links";
 export const metadata: Metadata = {
   title: "Free AI agent app for iPhone, Mac, Windows and Linux",
   description:
-    "Codync is a 100% free, open-source AI agent app. Run Claude Code, Codex, Cursor, Gemini and 40+ agents as named bots on your own computer, for code and everyday tasks, and message them from your iPhone. No subscription.",
+    "Squadbots is a 100% free, open-source AI agent app. Run Claude Code, Codex, Cursor, Gemini and 40+ agents as named bots on your own computer, for code and everyday tasks, and message them from your iPhone. No subscription.",
   alternates: { canonical: "/free-ai-agent-app" },
 };
 
@@ -27,11 +27,11 @@ const uses = [
 const faq: [string, string][] = [
   [
     "Is there a free AI agent app?",
-    "Codync is one: the app and every feature cost $0 and it's open source (Apache 2.0). Your bots use the agent plans or API keys you already have, such as a Claude or ChatGPT plan.",
+    "Squadbots is one: the app and every feature cost $0 and it's open source (Apache 2.0). Your bots use the agent plans or API keys you already have, such as a Claude or ChatGPT plan.",
   ],
   [
     "What's the catch?",
-    "None from Codync: no paid tier, no ads, no locked features. The agents themselves still need their own provider plan or key, and they run on your computer.",
+    "None from Squadbots: no paid tier, no ads, no locked features. The agents themselves still need their own provider plan or key, and they run on your computer.",
   ],
   [
     "Which AI agents can I use?",
@@ -62,7 +62,7 @@ export default function Page() {
               The free AI agent app. Really free.
             </h1>
             <p className="mt-6 max-w-[40rem] text-lg leading-relaxed text-neutral-400">
-              Codync turns Claude Code, Codex, Cursor, Gemini and 40+ AI agents into named bots on your own computer, for
+              Squadbots turns Claude Code, Codex, Cursor, Gemini and 40+ AI agents into named bots on your own computer, for
               code and everyday tasks. Message them from your iPhone, Mac, Windows PC or Linux desktop. No subscription, no
               paid tier: it&apos;s open source.
             </p>

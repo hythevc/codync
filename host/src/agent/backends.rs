@@ -26,7 +26,7 @@ pub struct Harness {
     pub registry: Option<&'static str>,
     /// What to tell someone setting it up by hand.
     pub setup: &'static str,
-    /// How Codync installs the CLI for you (in a setup terminal).
+    /// How Squadbots installs the CLI for you (in a setup terminal).
     pub install: Option<Install>,
     /// Shell command that signs in, run in a setup terminal (`{bin}` = the CLI).
     pub login: &'static str,
@@ -45,7 +45,7 @@ pub enum Install {
 }
 
 impl Install {
-    /// `None`: nothing Codync can run on this platform.
+    /// `None`: nothing Squadbots can run on this platform.
     pub fn command(self) -> Option<String> {
         match self {
             Self::Script(s) | Self::Scripts { unix: s, .. } if cfg!(unix) => Some(s.to_owned()),
@@ -390,7 +390,7 @@ static SEARCH_PATH: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 /// Login-shell PATH, via `$SHELL -ilc` with a timeout (nvm/conda can make shells slow).
 /// Windows has no login shell: every process already gets the user's PATH.
 fn login_shell_path() -> Option<String> {
-    const MARK: &str = "__CODYNC_PATH__";
+    const MARK: &str = "__SQUADBOTS_PATH__";
     if cfg!(windows) {
         return None;
     }
@@ -566,7 +566,7 @@ pub fn list() -> Vec<Value> {
             "available": registry::launch_kind(a).is_some(),
             "path": null,
             "description": a["description"],
-            "installHint": format!("Codync installs it automatically. Sign in to {} on this computer first if it needs an account.", a["name"].as_str().unwrap_or(id)),
+            "installHint": format!("Squadbots installs it automatically. Sign in to {} on this computer first if it needs an account.", a["name"].as_str().unwrap_or(id)),
             "signedIn": signed_in(id),
             "command": "",
             "registry": id,
@@ -665,13 +665,13 @@ fn registry_cli(h: &Harness) -> Option<Value> {
     (npx == pkg || npx.strip_prefix(pkg).is_some_and(|v| v.starts_with('@'))).then_some(agent)
 }
 
-/// Codync's own sign-in command for `id` can run now.
+/// Squadbots's own sign-in command for `id` can run now.
 pub fn login_available(id: &str) -> bool {
     harness(id)
         .is_some_and(|h| h.bins.iter().any(|b| on_path(b)) || !h.login.contains("{bin}") || registry_cli(h).is_some())
 }
 
-/// Codync's own sign-in command for `id`, with `{bin}` resolved.
+/// Squadbots's own sign-in command for `id`, with `{bin}` resolved.
 pub async fn login_command(id: &str) -> anyhow::Result<String> {
     let h = harness(id).ok_or_else(|| anyhow::anyhow!("no sign-in command for {id}"))?;
     let bin = match h.bins.iter().find_map(|b| which(b)) {
@@ -701,7 +701,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn detects_executables_on_search_path() {
-        let dir = std::env::temp_dir().join(format!("codync-bin-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("squadbots-bin-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let bin = dir.join("fake-harness");
         std::fs::write(&bin, "#!/bin/sh\n").unwrap();

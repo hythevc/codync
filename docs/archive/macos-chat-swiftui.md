@@ -1,6 +1,6 @@
 # macOS chat interaction
 
-The reference is the locally installed Grok Bot 0.66.0 desktop chat. Codync renders
+The reference is the locally installed Grok Bot 0.66.0 desktop chat. Squadbots renders
 its own messages and actions in SwiftUI; it does not embed Electron or a web view.
 The scope is the transcript, bubbles, composer and inspector controls, not the
 roster, account pages or Grok-specific services.

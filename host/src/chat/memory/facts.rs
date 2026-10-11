@@ -1,4 +1,4 @@
-//! Read-only projection of Engram's pinned schema for Codync's UI and prompt.
+//! Read-only projection of Engram's pinned schema for Squadbots's UI and prompt.
 //! These blocking methods run on `spawn_blocking`; every write uses native MCP.
 
 use super::{MAX_FACT_CHARS, PROFILE_PROMPT_LIMIT, engram};
@@ -53,7 +53,7 @@ impl Memory {
         tokio::runtime::Handle::try_current()
             .context("memory access requires a host runtime")?
             .block_on(engram::prepare(bot))?;
-        Ok(Self { bot: bot.to_owned(), dir, session: format!("{}:codync-background", engram::project(bot)) })
+        Ok(Self { bot: bot.to_owned(), dir, session: format!("{}:squadbots-background", engram::project(bot)) })
     }
 
     pub fn for_session(bot: &str, session: &str) -> Result<Self> {
@@ -118,7 +118,7 @@ impl Memory {
                 "scope": if kind == Kind::Profile { "personal" } else { "project" },
                 "project": engram::project(&self.bot), "capture_prompt": false,
                 "session_id": self.session,
-                "topic_key": format!("codync/keeper/{at_ms}/{}", super::read::content_hash(&content)),
+                "topic_key": format!("squadbots/keeper/{at_ms}/{}", super::read::content_hash(&content)),
             }),
         )?;
         Ok(true)

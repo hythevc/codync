@@ -9,7 +9,7 @@ import type { AppModel } from '../store/app-model'
 import { providerTint, resetDate, untilText, windowTitle } from './usage/usage-model'
 import { mascotDataURL } from './usage/ProviderMascot'
 
-const isMac = window.codync.platform === 'darwin'
+const isMac = window.squadbots.platform === 'darwin'
 
 /** Rendered icons by what they show and the appearance: nothing is redrawn while nothing changed. */
 const cache = new Map<string, string>()
@@ -123,7 +123,7 @@ export function useTraySummary(app: AppModel) {
         textSize,
         usageIconStyle: iconStyle,
       }
-      window.codync.app.setTraySummary(summary)
+      window.squadbots.app.setTraySummary(summary)
     }, 150)
     return () => clearTimeout(timer)
   })
@@ -134,7 +134,7 @@ function screenSubtitle(app: AppModel) {
   const screen = local?.screen
   if (!local || !screen || !screen.enabled) return `Control this ${isMac ? 'Mac' : 'computer'} from your iPhone`
   if (app.screenNeedsApproval) return 'Needs approval in System Settings'
-  if (!screen.connected) return 'Starting Codync Screen…'
+  if (!screen.connected) return 'Starting Squadbots Screen…'
   if (!screen.capture || !screen.input) return 'Needs permission'
   if (screen.viewers > 0) return screen.viewers === 1 ? 'Your iPhone is viewing' : `${screen.viewers} viewers`
   const bot = screen.agentBot ? local.bots.get(screen.agentBot) : null

@@ -1,5 +1,5 @@
 //! Per-bot Engram memory with automatic extraction, recall and native MCP tools.
-//! Transcripts stay in Codync; all durable memory lives in Engram's SQLite database.
+//! Transcripts stay in Squadbots; all durable memory lives in Engram's SQLite database.
 
 mod dates;
 mod engram;

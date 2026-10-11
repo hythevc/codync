@@ -9,7 +9,7 @@ use std::{
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
-        let path = std::env::temp_dir().join(format!("codync-update-test-{}", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!("squadbots-update-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -24,7 +24,7 @@ fn manifest() -> release::Release {
     release::Release {
         version: "3.0.0".into(),
         platform: "linux-arm64".into(),
-        url: format!("{}/download/v3.0.0/codync-host-linux-arm64.tar.gz", release::RELEASES),
+        url: format!("{}/download/v3.0.0/squadbots-host-linux-arm64.tar.gz", release::RELEASES),
         sha256: "a".repeat(64),
         size: 12,
     }
@@ -83,7 +83,7 @@ fn archive(symlink: bool) -> Vec<u8> {
     }
     header.set_cksum();
     let contents: &[u8] = if symlink { b"" } else { b"new" };
-    tar.append_data(&mut header, "codync-host-linux-arm64/codync-host", contents).unwrap();
+    tar.append_data(&mut header, "squadbots-host-linux-arm64/squadbots-host", contents).unwrap();
     tar.into_inner().unwrap().finish().unwrap()
 }
 
@@ -104,18 +104,18 @@ fn the_screen_helper_is_extracted_only_when_the_archive_carries_it() {
     let dir = Directory::new();
     let gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     let mut tar = tar::Builder::new(gzip);
-    for (name, contents) in [("codync-host", b"new"), ("codync-screen", b"scr")] {
+    for (name, contents) in [("squadbots-host", b"new"), ("squadbots-screen", b"scr")] {
         let mut header = tar::Header::new_gnu();
         header.set_mode(0o755);
         header.set_size(3);
         header.set_cksum();
-        tar.append_data(&mut header, format!("codync-host-linux-arm64/{name}"), &contents[..]).unwrap();
+        tar.append_data(&mut header, format!("squadbots-host-linux-arm64/{name}"), &contents[..]).unwrap();
     }
     let with_helper = tar.into_inner().unwrap().finish().unwrap();
     let helper = dir.0.join("helper");
-    assert!(release::extract_file(&with_helper, "linux-arm64", "codync-screen", &helper).unwrap());
+    assert!(release::extract_file(&with_helper, "linux-arm64", "squadbots-screen", &helper).unwrap());
     assert_eq!(std::fs::read(&helper).unwrap(), b"scr");
-    assert!(!release::extract_file(&archive(false), "linux-arm64", "codync-screen", &dir.0.join("none")).unwrap());
+    assert!(!release::extract_file(&archive(false), "linux-arm64", "squadbots-screen", &dir.0.join("none")).unwrap());
 }
 
 #[tokio::test]
@@ -189,11 +189,11 @@ async fn a_healthy_update_replaces_the_binary_and_removes_its_backup() {
 #[test]
 fn app_and_homebrew_binaries_keep_their_installation_owner() {
     assert_eq!(
-        install::method(std::path::Path::new("/Applications/Codync.app/Contents/MacOS/codync-host")),
+        install::method(std::path::Path::new("/Applications/Squadbots.app/Contents/MacOS/squadbots-host")),
         install::Method::AppBundle
     );
     assert_eq!(
-        install::method(std::path::Path::new("/opt/homebrew/Cellar/codync-host/2.2.1/bin/codync-host")),
+        install::method(std::path::Path::new("/opt/homebrew/Cellar/squadbots-host/2.2.1/bin/squadbots-host")),
         install::Method::Homebrew
     );
 }

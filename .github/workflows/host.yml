@@ -1,4 +1,4 @@
-name: codync-host
+name: squadbots-host
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
         run: python ../packaging/engram/test-runtime.py
       - run: cargo test
       - run: cargo test --test memory_e2e -- --ignored
-      - run: cargo test --bin codync-host native_memory_survives_restart -- --ignored
+      - run: cargo test --bin squadbots-host native_memory_survives_restart -- --ignored
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -44,7 +44,7 @@ jobs:
       matrix:
         include:
           # musl: one static binary that runs on any distro, whatever its glibc.
-          # codync-screen (Remote screen on Linux) links the system GStreamer 1.22+, so it is built
+          # squadbots-screen (Remote screen on Linux) links the system GStreamer 1.22+, so it is built
           # for glibc on Ubuntu 24.04 and ships next to the host in the same archive.
           - { os: ubuntu-24.04, target: x86_64-unknown-linux-musl, name: linux-x86_64 }
           - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, name: linux-arm64 }
@@ -67,21 +67,21 @@ jobs:
         # Vendored C (dbus) would call libgcc's outline atomics, which a static musl link lacks.
         env:
           CFLAGS_aarch64_unknown_linux_musl: -mno-outline-atomics
-          CODYNC_ENV: main  # released hosts use the main cloud; local builds use dev
+          SQUADBOTS_ENV: main  # released hosts use the main cloud; local builds use dev
         run: |
           VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
           test "v$VERSION" = "$GITHUB_REF_NAME" || { echo 'Host version must match release tag'; exit 1; }
           cargo build --release --target ${{ matrix.target }}
-      - name: Build codync-screen
+      - name: Build squadbots-screen
         if: runner.os == 'Linux'
         run: cargo build --release --manifest-path apps/screen-linux/Cargo.toml
       - name: Package
         run: |
-          NAME=codync-host-${{ matrix.name }}
+          NAME=squadbots-host-${{ matrix.name }}
           mkdir $NAME
-          cp host/target/${{ matrix.target }}/release/codync-host $NAME/
+          cp host/target/${{ matrix.target }}/release/squadbots-host $NAME/
           if [ "$RUNNER_OS" = Linux ]; then
-            cp apps/screen-linux/target/release/codync-screen $NAME/
+            cp apps/screen-linux/target/release/squadbots-screen $NAME/
             # The computer-use driver the host starts from beside itself (pinned, checked).
             node packaging/cua-driver/fetch.mjs ${{ matrix.name }} $NAME/
           fi
@@ -95,20 +95,20 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/update-signing"
           "$RUNNER_TEMP/update-signing/bin/pip" install 'cryptography>=44,<47'
           "$RUNNER_TEMP/update-signing/bin/python" packaging/updates/sign-host-release.py \
-            "codync-host-${{ matrix.name }}.tar.gz" \
+            "squadbots-host-${{ matrix.name }}.tar.gz" \
             --version "$GITHUB_REF_NAME" --platform "${{ matrix.name }}"
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            codync-host-*.tar.gz
-            codync-host-*.tar.gz.sha256
-            codync-host-*.update.json
-            codync-host-*.update.json.sig
-            codync-host-*.compat.json
-            codync-host-*.compat.json.sig
+            squadbots-host-*.tar.gz
+            squadbots-host-*.tar.gz.sha256
+            squadbots-host-*.update.json
+            squadbots-host-*.update.json.sig
+            squadbots-host-*.compat.json
+            squadbots-host-*.compat.json.sig
 
   homebrew:
-    # Keeps `brew install leepokai/codync/codync-host` (Linux, headless Macs) in step with releases.
+    # Keeps `brew install jaimedhenriques/squadbots/squadbots-host` (Linux, headless Macs) in step with releases.
     needs: release
     runs-on: ubuntu-latest
     steps:
@@ -118,19 +118,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          gh release download "$GITHUB_REF_NAME" --pattern 'codync-host-*.sha256' --dir sums
-          sha() { cut -d' ' -f1 "sums/codync-host-$1.tar.gz.sha256"; }
+          gh release download "$GITHUB_REF_NAME" --pattern 'squadbots-host-*.sha256' --dir sums
+          sha() { cut -d' ' -f1 "sums/squadbots-host-$1.tar.gz.sha256"; }
           sed -e "s/^  version .*/  version \"$VERSION\"/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha macos-arm64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha macos-x86_64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-arm64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-x86_64)/" \
-              packaging/homebrew/codync-host.rb > codync-host.rb
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
-          mkdir -p tap/Formula && cp codync-host.rb tap/Formula/ && cp packaging/homebrew/README.md tap/
+              packaging/homebrew/squadbots-host.rb > squadbots-host.rb
+          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/jaimedhenriques/homebrew-squadbots.git tap
+          mkdir -p tap/Formula && cp squadbots-host.rb tap/Formula/ && cp packaging/homebrew/README.md tap/
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "codync-host $VERSION" || exit 0
+          git commit -m "squadbots-host $VERSION" || exit 0
           git push

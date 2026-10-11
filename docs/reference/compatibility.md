@@ -19,7 +19,7 @@ always equal). There is no separate protocol number.
 On every (re)connect the client reads `hello` and decides, in this order:
 
 1. its own version is below `minApp` → **Update this app**;
-2. the host's `version` is below its `minHost` → **Update Codync on <computer>**;
+2. the host's `version` is below its `minHost` → **Update Squadbots on <computer>**;
 3. otherwise it syncs normally.
 
 Versions compare as `major.minor.patch` (a leading `v` and any `-pre`/`+build` suffix are
@@ -79,24 +79,24 @@ installing such a release:
 | The App Store can't be asked or has no answer | Automatic update waits; a person can install anyway |
 
 - **Standalone hosts** (`host/src/update`): each release publishes a signed
-  `codync-host-<platform>.compat.json` (`{"version", "minApp"}`, ~50 bytes, same key as the
+  `squadbots-host-<platform>.compat.json` (`{"version", "minApp"}`, ~50 bytes, same key as the
   manifest, written by `sign-host-release.py` from `MIN_APP`), so the updater decides before
   downloading anything; for a release without one it runs the verified download
-  (`codync-host compat`) instead. The signed manifest itself is unchanged, as old hosts
+  (`squadbots-host compat`) instead. The signed manifest itself is unchanged, as old hosts
   expect it. Waiting shows as phase `waitingForApp` with `requiredApp` and `appStoreVersion`
-  in the update status; `codync-host update --skip-app-check` (API
+  in the update status; `squadbots-host update --skip-app-check` (API
   `installHostUpdate {"skipAppCheck": true}`) installs anyway. With automatic updates on, a waiting host asks the App Store hourly and updates as
   soon as the app is there.
 - **Desktop app** (electron-updater): the release workflow adds `minApp` to `latest-mac.yml`,
   and `Updates.available` (`apps/desktop/src/main/updates.ts`) holds the release while the
   local host's `minApp` is lower, an iPhone is paired and the App Store is behind, before
   anything downloads. A check the person starts shows why. While waiting it checks hourly. The Sparkle appcast kept for the
-  SwiftUI Mac app's installs carries `<codync:minApp>` (`packaging/updates/annotate-appcast.py`);
+  SwiftUI Mac app's installs carries `<squadbots:minApp>` (`packaging/updates/annotate-appcast.py`);
   it is deprecated and removed after 2026-11-06 ([updates guide](../guides/updates.md#deprecated-the-sparkle-migration-appcast-remove-after-2026-11-06)).
 - Hosts released before 2.5.0 don't have this gate and install any release. Before the first
   real `minApp` raise, most computers should be on 2.5.0 or newer.
 
-On the iPhone, the *Update Codync* button of an *Update this app* notice is greyed out with
+On the iPhone, the *Update Squadbots* button of an *Update this app* notice is greyed out with
 "still in App Store review" while the App Store has an older version; an unanswered lookup
 keeps it enabled (the App Store page shows the truth).
 
@@ -123,7 +123,7 @@ the host's `minApp`.
 | Change | Test |
 |---|---|
 | Nothing on the wire | Passes |
-| New field | Fails until recorded: `CODYNC_UPDATE_WIRE_SHAPE=1 cargo test --test e2e wire_shape`, no decision needed |
+| New field | Fails until recorded: `SQUADBOTS_UPDATE_WIRE_SHAPE=1 cargo test --test e2e wire_shape`, no decision needed |
 | Field removed, renamed or retyped | Fails, and recording is refused, until `MIN_APP` differs from the recorded one; then record |
 
 So a breaking change can't land by accident: it either keeps the old field or raises the
@@ -144,17 +144,17 @@ Update this table in the release that changes a floor, with the reason.
 ## Trying it on a simulator
 
 Run a throwaway Debug host (it registers with the dev cloud) on its own data and port, never
-on `~/.codync` or 19222:
+on `~/.squadbots` or 19222:
 
 1. Build a copy with a patched floor or version into a separate target, then restore the
    source: e.g. `MIN_APP = "9.0.0"` in `host/src/compat.rs` (app too old) or `"version": "2.2.0"`
    in `hello` in `host/src/api/host.rs` (host too old), built with
    `CARGO_TARGET_DIR=<scratch>/hosttarget cargo build`.
-2. `CODYNC_HOME=<scratch>/home <scratch>/hosttarget/debug/codync-host serve --port 19333`.
+2. `SQUADBOTS_HOME=<scratch>/home <scratch>/hosttarget/debug/squadbots-host serve --port 19333`.
 3. Pair the simulator: `POST /api/pairing` with `<scratch>/home/token`, then launch with
-   `SIMCTL_CHILD_CODYNC_PAIR_URL=<pairingUrl>`.
-4. Swap hosts on the same `CODYNC_HOME` (patched ↔ normal) to see the notice appear in the
+   `SIMCTL_CHILD_SQUADBOTS_PAIR_URL=<pairingUrl>`.
+4. Swap hosts on the same `SQUADBOTS_HOME` (patched ↔ normal) to see the notice appear in the
    list and in place of an open chat's composer, and go away after the reconnect.
 
-The simulator has no App Store app, so *Update Codync* ends in a Safari error there; on a
+The simulator has no App Store app, so *Update Squadbots* ends in a Safari error there; on a
 device it opens the App Store.

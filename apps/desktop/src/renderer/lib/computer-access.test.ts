@@ -18,21 +18,21 @@ test('repeated checks never request permissions; explicit actions and failures s
   let fail = false
   let capture = false
   let settings = ''
-  Object.assign(globalThis, { window: { codync: { platform: 'darwin', app: {
+  Object.assign(globalThis, { window: { squadbots: { platform: 'darwin', app: {
     screenAgentState: async () => ({ available: true, needsApproval: false, registered: true }),
     openSettings: (url: string) => { settings = url },
   } } } })
   const app = { local: { connection: { kind: 'online' }, client: { call: async (method: string) => {
     calls.push(method)
     if (method === 'requestScreenPermission' && fail) throw new Error('Permission denied')
-    return { enabled: true, connected: true, capture, input: false, permissionApp: 'CodyncDevScreen' }
+    return { enabled: true, connected: true, capture, input: false, permissionApp: 'SquadbotsDevScreen' }
   } } }, setRemoteScreen: async () => { calls.push('enable') }, screenError: null } as unknown as AppModel
   const { ComputerAccess } = await import('../store/computer-access.ts')
   const access = new ComputerAccess(app)
   await access.refresh()
   await access.refresh()
   assert.deepEqual(calls, ['screenStatus', 'screenStatus'])
-  assert.equal(access.helperName, 'CodyncDevScreen')
+  assert.equal(access.helperName, 'SquadbotsDevScreen')
   assert.equal(access.step, 'capture')
   access.openSettings('input')
   assert.match(settings, /Privacy_Accessibility/)

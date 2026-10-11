@@ -2,7 +2,7 @@ import AVFoundation
 import Foundation
 import Speech
 
-// codync-speech: transcribes the microphone on device with SFSpeechRecognizer and prints one
+// squadbots-speech: transcribes the microphone on device with SFSpeechRecognizer and prints one
 // JSON event per line: {"type":"started"}, {"type":"partial"|"final","text":…},
 // {"type":"level","value":0…1}, {"type":"error","message":…}. It runs until stdin closes or
 // SIGTERM. `--locales` prints the languages it can transcribe (a JSON array) and exits. The desktop app (src/main/speech.ts) owns endpointing: it stops this process when
@@ -22,11 +22,11 @@ final class Recognizer {
 
     func start() async {
         guard await AVCaptureDevice.requestAccess(for: .audio) else {
-            return fail("Allow the microphone for Codync in System Settings to talk to your bots.")
+            return fail("Allow the microphone for Squadbots in System Settings to talk to your bots.")
         }
         let status = await withCheckedContinuation { done in SFSpeechRecognizer.requestAuthorization { done.resume(returning: $0) } }
         guard status == .authorized else {
-            return fail("Allow Speech Recognition for Codync in System Settings to talk to your bots.")
+            return fail("Allow Speech Recognition for Squadbots in System Settings to talk to your bots.")
         }
         guard let recognizer, recognizer.isAvailable else {
             return fail("Speech recognition isn't available for this language right now.")

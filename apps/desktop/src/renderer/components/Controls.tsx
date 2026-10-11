@@ -4,7 +4,7 @@ import { Icon } from './Icon'
 import { AnchoredMenu, IconButtonBase, type MenuItem } from './Overlay'
 import './controls.css'
 
-// Codync's own controls (kit Controls.swift): never the stock ones.
+// Squadbots's own controls (kit Controls.swift): never the stock ones.
 
 export const IconButton = IconButtonBase
 
@@ -49,7 +49,7 @@ export function Switch({ on, onChange, children, disabled, style }: { on: boolea
   )
 }
 
-/** A button that opens a Codync menu. */
+/** A button that opens a Squadbots menu. */
 export function DropdownMenu({ items, children, className, style, title }: { items: () => MenuItem[]; children: ReactNode; className?: string; style?: CSSProperties; title?: string }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLButtonElement>(null)
@@ -63,7 +63,7 @@ export function DropdownMenu({ items, children, className, style, title }: { ite
   )
 }
 
-/** Picks one value: the current choice in a pill with a chevron, opening a Codync menu. */
+/** Picks one value: the current choice in a pill with a chevron, opening a Squadbots menu. */
 export function ChoicePicker<T extends string | number>({ selection, options, onChange, fill, fits = false }: {
   selection: T
   options: { id: T; label: string }[]

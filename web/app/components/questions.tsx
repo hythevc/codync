@@ -4,12 +4,12 @@ import { GITHUB } from "../links";
 
 const questions: [string, string][] = [
   [
-    "Is Codync free?",
-    "Yes. Codync costs $0 with every feature included, and it's Apache 2.0 licensed. You pay only your agent's provider, through the plan or key you already have.",
+    "Is Squadbots free?",
+    "Yes. Squadbots costs $0 with every feature included, and it's Apache 2.0 licensed. You pay only your agent's provider, through the plan or key you already have.",
   ],
   [
     "Can I use my Claude or ChatGPT plan?",
-    "Yes. Codync runs the agents already signed in on your computer: Claude Code with your Claude plan, Codex with your ChatGPT plan, and so on. It never calls a provider's API with your login.",
+    "Yes. Squadbots runs the agents already signed in on your computer: Claude Code with your Claude plan, Codex with your ChatGPT plan, and so on. It never calls a provider's API with your login.",
   ],
   [
     "Which agents can it run?",
@@ -17,7 +17,7 @@ const questions: [string, string][] = [
   ],
   [
     "How do I start?",
-    "Install Codync on the computer your agents run on and create a bot. Then pair your iPhone by scanning the code from the Mac menu bar, the Windows or Linux app, or codync-host pair.",
+    "Install Squadbots on the computer your agents run on and create a bot. Then pair your iPhone by scanning the code from the Mac menu bar, the Windows or Linux app, or squadbots-host pair.",
   ],
   [
     "Where does my data go?",

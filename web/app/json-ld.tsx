@@ -1,7 +1,7 @@
 import { APP_STORE, DMG_FILE, GITHUB, PRODUCT_HUNT } from "./links";
 import { DESCRIPTION, SITE } from "./site";
 
-// Structured data so search and AI answer engines read Codync as a free, open-source app.
+// Structured data so search and AI answer engines read Squadbots as a free, open-source app.
 const graph = {
   "@context": "https://schema.org",
   "@graph": [
@@ -9,13 +9,13 @@ const graph = {
       "@type": "WebSite",
       "@id": `${SITE}/#website`,
       url: SITE,
-      name: "Codync",
+      name: "Squadbots",
       publisher: { "@id": `${SITE}/#org` },
     },
     {
       "@type": "Organization",
       "@id": `${SITE}/#org`,
-      name: "Codync",
+      name: "Squadbots",
       url: SITE,
       logo: `${SITE}/icon.png`,
       sameAs: [GITHUB, APP_STORE, PRODUCT_HUNT],
@@ -23,7 +23,7 @@ const graph = {
     {
       "@type": "SoftwareApplication",
       "@id": `${SITE}/#app`,
-      name: "Codync",
+      name: "Squadbots",
       url: SITE,
       description: DESCRIPTION,
       applicationCategory: "DeveloperApplication",

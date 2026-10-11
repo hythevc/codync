@@ -1,7 +1,7 @@
 // Comparison pages. Every claim about another product comes from the sources listed with it;
 // anything those pages don't say is "not documented", never a guess. Re-check when updating.
 
-type Row = [topic: string, codync: string, them: string];
+type Row = [topic: string, squadbots: string, them: string];
 
 export type Rival = {
   slug: string;
@@ -41,7 +41,7 @@ export const rivals: Rival[] = [
     name: "Grok Bot",
     card: "Same bots, rooms and approvals, but on your computer and free.",
     summary:
-      "Grok Bot gives you named AI teammates that work on one shared cloud computer, with a paid Cursor or Grok plan. Codync is the same way of working, free and open source, with the bots on your own computer and any agent you already use.",
+      "Grok Bot gives you named AI teammates that work on one shared cloud computer, with a paid Cursor or Grok plan. Squadbots is the same way of working, free and open source, with the bots on your own computer and any agent you already use.",
     rows: [
       ["Price", us.price, "No free plan listed. Comes with Cursor Pro ($20/mo) and up or SuperGrok ($30/mo) and up; usage beyond the plan is billed by tokens."],
       ["Where bots run", us.runs, "On one persistent cloud computer per user, run by SpaceXAI."],
@@ -72,7 +72,7 @@ export const rivals: Rival[] = [
     name: "Muse",
     card: "Meta's cloud agent and model, or bots on your own computer.",
     summary:
-      "Muse is Meta's personal AI agent for goals and errands such as email, travel and shopping, running on a cloud VM with Meta's own model. Codync gives you a team of bots on your own computer, for code and everything else: they run the agents you choose, use your connected apps, browse and use the computer, and work on a schedule, for free.",
+      "Muse is Meta's personal AI agent for goals and errands such as email, travel and shopping, running on a cloud VM with Meta's own model. Squadbots gives you a team of bots on your own computer, for code and everything else: they run the agents you choose, use your connected apps, browse and use the computer, and work on a schedule, for free.",
     rows: [
       ["Price", us.price, "Free with a usage limit. Power is $20/mo and Maximum $100/mo."],
       ["Where bots run", us.runs, "On Muse Secure VM, a cloud Linux VM run by Meta."],
@@ -103,7 +103,7 @@ export const rivals: Rival[] = [
     name: "Dots",
     card: "OpenAI's always-on cloud agent, or any agent on your computer.",
     summary:
-      "Dots are OpenAI's always-on agents: one dot per person, on GPT-6 Astra, working from its own cloud computer, with a ChatGPT Pro or Business Premium plan. Codync gives you a team of bots on your own computer that run Claude Code, Codex or any other agent you already use, for free.",
+      "Dots are OpenAI's always-on agents: one dot per person, on GPT-6 Astra, working from its own cloud computer, with a ChatGPT Pro or Business Premium plan. Squadbots gives you a team of bots on your own computer that run Claude Code, Codex or any other agent you already use, for free.",
     rows: [
       ["Price", us.price, "Your first dot comes with ChatGPT Pro (from $100/mo) or Business Premium; deeper work draws on a plan allowance."],
       ["Where bots run", us.runs, "On its own cloud computer and browser, run by OpenAI. It can use your laptop if you allow it."],
@@ -131,9 +131,9 @@ export const rivals: Rival[] = [
   {
     slug: "claude-remote-control",
     name: "Claude Remote Control",
-    card: "Anthropic's phone remote is Claude only. Codync runs any agent.",
+    card: "Anthropic's phone remote is Claude only. Squadbots runs any agent.",
     summary:
-      "Remote Control lets the Claude app on your phone drive a Claude Code session on your computer, with a paid Claude plan. Codync works with Claude Code and every other agent, as persistent bots you can put in a room, for free.",
+      "Remote Control lets the Claude app on your phone drive a Claude Code session on your computer, with a paid Claude plan. Squadbots works with Claude Code and every other agent, as persistent bots you can put in a room, for free.",
     rows: [
       ["Price", us.price, "Needs a Claude Pro, Max, Team or Enterprise plan; API keys and other providers don't work."],
       ["Where bots run", us.runs, "Claude Code on your machine, relayed through Anthropic; or cloud sessions on Anthropic's servers."],
@@ -160,9 +160,9 @@ export const rivals: Rival[] = [
   {
     slug: "happy",
     name: "Happy",
-    card: "Both free and open source. Codync adds bots, rooms and memory.",
+    card: "Both free and open source. Squadbots adds bots, rooms and memory.",
     summary:
-      "Happy is a free, open-source phone and web client for Claude Code and Codex sessions on your computer. Codync turns those agents into persistent named bots with group chats, memory, routines, voice and remote screen.",
+      "Happy is a free, open-source phone and web client for Claude Code and Codex sessions on your computer. Squadbots turns those agents into persistent named bots with group chats, memory, routines, voice and remote screen.",
     rows: [
       ["Price", us.price, "Free."],
       ["Where bots run", us.runs, "On your computer; you start sessions with happy claude instead of claude."],

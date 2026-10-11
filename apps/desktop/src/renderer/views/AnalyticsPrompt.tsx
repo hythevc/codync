@@ -8,11 +8,11 @@ import { prefs, usePref } from '../lib/prefs'
 import { useApp } from '../store/context'
 import { errorText } from './settings/parts'
 
-const device = window.codync.platform === 'darwin' ? 'Mac' : 'computer'
+const device = window.squadbots.platform === 'darwin' ? 'Mac' : 'computer'
 /** What the answer covers; same points as the iPhone's and the terminal's question. */
 const points: [icon: string, text: string][] = [
   ['eye.slash', 'Never your messages, code, files, prompts or bot names'],
-  ['lock.shield', "Never sold or used for ads. Linked to your Codync account when you're signed in"],
+  ['lock.shield', "Never sold or used for ads. Linked to your Squadbots account when you're signed in"],
   ['gearshape', 'Turn it off anytime in Settings'],
 ]
 /** Read at launch: a welcome screen finished later was this launch's onboarding. */
@@ -43,11 +43,11 @@ export function AnalyticsPrompt() {
   return (
     <Sheet open={open} onClose={() => setClosed(true)}>
       <div style={{ width: 420, display: 'flex', flexDirection: 'column' }}>
-        <ModalHeader title="Help improve Codync" />
+        <ModalHeader title="Help improve Squadbots" />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '0 24px 24px' }}>
           <Icon name="chart.bar" size={36} weight="light" color="var(--secondary)" />
           <div style={{ ...font('callout'), color: 'var(--secondary)', textAlign: 'center' }}>
-            Codync can record which features you use on this {device}, like creating a bot or sending a message.
+            Squadbots can record which features you use on this {device}, like creating a bot or sending a message.
           </div>
           <div style={{ alignSelf: 'stretch', display: 'flex', flexDirection: 'column', gap: 10, padding: 14, borderRadius: 16, background: 'var(--surface)' }}>
             {points.map(([icon, text]) => (

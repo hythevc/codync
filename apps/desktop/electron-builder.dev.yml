@@ -1,40 +1,40 @@
 # Overrides applied by tools/dev-builder.cjs (arrays replace, never merge).
-appId: com.pokai.Codync.dev
-productName: Codync Dev
+appId: ai.squadbots.Squadbots.dev
+productName: Squadbots Dev
 # Linux package managers and Windows installer caches also key on package.json's name.
 extraMetadata:
-  name: codync-desktop-dev
-  productName: Codync Dev
-  desktopName: codync-dev.desktop
+  name: squadbots-desktop-dev
+  productName: Squadbots Dev
+  desktopName: squadbots-dev.desktop
 protocols:
-  - name: Codync Dev
-    schemes: [codync-dev, com.pokai.Codync.dev]
+  - name: Squadbots Dev
+    schemes: [squadbots-dev, ai.squadbots.Squadbots.dev]
 publish: null
 mac:
   signIgnore:
-    - CodyncDevScreen\.app/Contents/Helpers/cua-driver$
-  artifactName: codync-dev-macos.${ext}
+    - SquadbotsDevScreen\.app/Contents/Helpers/cua-driver$
+  artifactName: squadbots-dev-macos.${ext}
   notarize: false
   extraFiles:
-    - from: build/native/CodyncDevScreen.app
-      to: Library/LoginItems/CodyncDevScreen.app
-    - from: resources/mac/com.pokai.Codync.dev.screen.plist
-      to: Library/LaunchAgents/com.pokai.Codync.dev.screen.plist
+    - from: build/native/SquadbotsDevScreen.app
+      to: Library/LoginItems/SquadbotsDevScreen.app
+    - from: resources/mac/ai.squadbots.Squadbots.dev.screen.plist
+      to: Library/LaunchAgents/ai.squadbots.Squadbots.dev.screen.plist
 dmg:
-  artifactName: codync-dev-macos.dmg
+  artifactName: squadbots-dev-macos.dmg
 linux:
-  executableName: codync-dev
-  artifactName: codync-dev-linux-${arch}.${ext}
+  executableName: squadbots-dev
+  artifactName: squadbots-dev-linux-${arch}.${ext}
   desktop:
     entry:
-      StartupWMClass: Codync Dev
+      StartupWMClass: Squadbots Dev
 win:
-  artifactName: codync-dev-windows-x64.${ext}
+  artifactName: squadbots-dev-windows-x64.${ext}
   extraResources:
-    - from: build/native/codync-host.exe
-      to: codync-host.exe
-    - from: build/native/codync-dev-hostw.exe
-      to: codync-dev-hostw.exe
+    - from: build/native/squadbots-host.exe
+      to: squadbots-host.exe
+    - from: build/native/squadbots-dev-hostw.exe
+      to: squadbots-dev-hostw.exe
     - from: build/native/cua-driver.exe
       to: cua-driver.exe
     - from: build/native/cua-driver-uia.exe

@@ -18,7 +18,7 @@ export function SiteHeader() {
       <nav className="mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto] items-center px-4 sm:px-6 md:grid-cols-[1fr_auto_1fr]">
         <Link href="/" className="flex items-center gap-2.5 font-semibold text-neutral-50">
           <Image src="/icon.png" alt="" width={28} height={28} className="rounded-[7px]" />
-          Codync
+          Squadbots
         </Link>
         <div className="hidden items-center gap-1 md:flex">
           {nav.map(([href, label]) => (
@@ -30,7 +30,7 @@ export function SiteHeader() {
         <div className="flex items-center justify-end gap-2">
           <a
             href={GITHUB}
-            aria-label="Codync on GitHub"
+            aria-label="Squadbots on GitHub"
             title="GitHub"
             className="rounded-full p-2 text-neutral-400 transition hover:text-neutral-100"
           >

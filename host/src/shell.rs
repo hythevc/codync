@@ -36,7 +36,7 @@ pub fn line(line: &str) -> Shell {
 }
 
 #[cfg(windows)]
-const LINE_VAR: &str = "CODYNC_COMMAND_LINE";
+const LINE_VAR: &str = "SQUADBOTS_COMMAND_LINE";
 
 /// `cmd` has no `KEY=value cmd` syntax, so leading assignments become the environment.
 #[cfg(windows)]

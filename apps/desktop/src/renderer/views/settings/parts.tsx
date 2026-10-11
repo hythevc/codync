@@ -4,7 +4,7 @@ import { font } from '../../lib/fonts'
 import type { BotStore } from '../../store/bot-store'
 import './settings.css'
 
-export const isMac = window.codync.platform === 'darwin'
+export const isMac = window.squadbots.platform === 'darwin'
 /** "Mac" in the Mac app's copy; "computer" elsewhere. */
 export const thisMac = isMac ? 'this Mac' : 'this computer'
 

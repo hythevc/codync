@@ -6,7 +6,7 @@ struct HelperError: LocalizedError {
     init(_ message: String) { errorDescription = message }
 }
 
-/// JSON-RPC 2.0, one message per line, over the host's `~/.codync/screen.sock`.
+/// JSON-RPC 2.0, one message per line, over the host's `~/.squadbots/screen.sock`.
 /// The host sends requests; we answer them and send notifications. Reconnects forever.
 @MainActor
 final class HostLink {
@@ -21,7 +21,7 @@ final class HostLink {
     var onConnect: (@MainActor () -> Void)?
 
     static var socketPath: String {
-        let base = ProcessInfo.processInfo.environment["CODYNC_HOME"] ?? NSHomeDirectory() + "/" + (Bundle.main.object(forInfoDictionaryKey: "CodyncDataFolder") as? String ?? ".codync")
+        let base = ProcessInfo.processInfo.environment["SQUADBOTS_HOME"] ?? NSHomeDirectory() + "/" + (Bundle.main.object(forInfoDictionaryKey: "SquadbotsDataFolder") as? String ?? ".squadbots")
         return base + "/screen.sock"
     }
 

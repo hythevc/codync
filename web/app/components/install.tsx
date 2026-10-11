@@ -7,7 +7,7 @@ import Halftone from "./halftone";
 import Reveal from "./reveal";
 import { APP_STORE, DMG, WINDOWS } from "../links";
 
-const INSTALL_SH = "curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh";
+const INSTALL_SH = "curl -fsSL https://raw.githubusercontent.com/jaimedhenriques/squadbots/main/packaging/install.sh | sh";
 
 export default function Install() {
   return (
@@ -18,7 +18,7 @@ export default function Install() {
           <Eyebrow>Install</Eyebrow>
           <h2 className="text-3xl font-semibold tracking-tight text-neutral-50 md:text-4xl">Install once.</h2>
           <p className="mt-4 max-w-[36rem] text-lg leading-relaxed text-neutral-400">
-            Put Codync on the computer your agents run on, then pair your phone from it.
+            Put Squadbots on the computer your agents run on, then pair your phone from it.
           </p>
         </Reveal>
 
@@ -28,10 +28,10 @@ export default function Install() {
               <AppleLogo size={28} weight="fill" className="text-neutral-50" />
               <h3 className="mt-5 text-xl font-semibold text-neutral-50">Mac</h3>
               <p className="mt-2 flex-1 leading-relaxed text-neutral-400">
-                Open Codync and it starts the host itself. Or install with Homebrew:
+                Open Squadbots and it starts the host itself. Or install with Homebrew:
               </p>
               <div className="mt-5">
-                <CopyCommand command="brew install --cask leepokai/codync/codync" />
+                <CopyCommand command="brew install --cask jaimedhenriques/squadbots/squadbots" />
               </div>
               <a href={DMG} className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-neutral-50 px-5 font-medium text-neutral-950 transition hover:bg-white active:scale-[0.98]">
                 <AppleLogo size={16} weight="fill" />
@@ -45,7 +45,7 @@ export default function Install() {
               <WindowsLogo size={28} weight="fill" className="text-neutral-50" />
               <h3 className="mt-5 text-xl font-semibold text-neutral-50">Windows</h3>
               <p className="mt-2 flex-1 leading-relaxed text-neutral-400">
-                Run the installer and Codync starts the host itself. The installer isn&apos;t signed yet, so Windows
+                Run the installer and Squadbots starts the host itself. The installer isn&apos;t signed yet, so Windows
                 asks you to confirm it once.
               </p>
               <a href={WINDOWS} className="mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-full bg-neutral-50 px-5 font-medium text-neutral-950 transition hover:bg-white active:scale-[0.98]">
@@ -61,7 +61,7 @@ export default function Install() {
               <h3 className="mt-5 text-xl font-semibold text-neutral-50">Linux and servers</h3>
               <p className="mt-2 flex-1 leading-relaxed text-neutral-400">
                 The host, plus the desktop app when there is a display. Then run{" "}
-                <code className="font-mono text-neutral-200">codync-host install</code>.
+                <code className="font-mono text-neutral-200">squadbots-host install</code>.
               </p>
               <div className="mt-5">
                 <CopyCommand command={INSTALL_SH} />
@@ -75,7 +75,7 @@ export default function Install() {
               <h3 className="mt-5 text-xl font-semibold text-neutral-50">iPhone</h3>
               <p className="mt-2 flex-1 leading-relaxed text-neutral-400">
                 Get the app, then scan the code from <span className="text-neutral-200">Pair iPhone…</span> in the
-                Mac menu bar, the Windows or Linux app, or <code className="font-mono text-neutral-200">codync-host pair</code>.
+                Mac menu bar, the Windows or Linux app, or <code className="font-mono text-neutral-200">squadbots-host pair</code>.
               </p>
               <a
                 href={APP_STORE}

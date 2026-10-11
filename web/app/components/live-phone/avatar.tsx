@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { palette, swatch } from "./data";
 
-// Port of CodyncKit/Design/CharacterAvatar.swift: the halftone character, dot for dot.
+// Port of SquadbotsKit/Design/CharacterAvatar.swift: the halftone character, dot for dot.
 
 /** Rounded so server (Node) and browser math print the same SVG. */
 const q = (v: number) => Math.round(v * 1000) / 1000;

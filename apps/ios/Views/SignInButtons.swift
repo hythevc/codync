@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import SquadbotsKit
+import SquadbotsUI
 import SwiftUI
 
 /// Equal access to both account providers at every sign-in entry point.

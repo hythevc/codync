@@ -171,7 +171,7 @@ pub fn observe(caller: &Caller, method: &str, b: &Value) -> Option<(Event, Map<S
     Some((event, p))
 }
 
-/// Queues one event when the owner said yes. Signed in to a Codync account, events are
+/// Queues one event when the owner said yes. Signed in to a Squadbots account, events are
 /// linked to that account; otherwise to this install's random id, with no person profile.
 pub fn capture(hub: &Hub, event: Event, mut properties: Map<String, Value>) {
     if !hub.analytics.enabled() {
@@ -194,9 +194,9 @@ pub fn capture(hub: &Hub, event: Event, mut properties: Map<String, Value>) {
 
 fn queue(hub: &Hub, event: &str, distinct_id: &str, mut properties: Map<String, Value>) {
     properties.extend([
-        ("$lib".into(), "codync-host".into()),
+        ("$lib".into(), "squadbots-host".into()),
         ("app_version".into(), env!("CARGO_PKG_VERSION").into()),
-        ("env".into(), (if option_env!("CODYNC_ENV") == Some("main") { "main" } else { "dev" }).into()),
+        ("env".into(), (if option_env!("SQUADBOTS_ENV") == Some("main") { "main" } else { "dev" }).into()),
         ("$os".into(), std::env::consts::OS.into()),
         ("arch".into(), std::env::consts::ARCH.into()),
         ("$geoip_disable".into(), true.into()),

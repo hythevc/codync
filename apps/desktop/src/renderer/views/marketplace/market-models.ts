@@ -165,7 +165,7 @@ export interface AgentAuth {
   methods: AuthMethod[]
   /** Keys saved on the computer for this agent (names only). */
   savedEnv?: string[] | null
-  /** Codync's own sign-in command is available. */
+  /** Squadbots's own sign-in command is available. */
   login?: boolean | null
 }
 

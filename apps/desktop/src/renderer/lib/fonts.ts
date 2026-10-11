@@ -14,7 +14,7 @@ export const TextStyle = {
   footnote: 10,
   caption: 10,
   caption2: 10,
-  /** Codync's compact desktop body (12) and secondary (11). */
+  /** Squadbots's compact desktop body (12) and secondary (11). */
   compactBody: 12,
   compactSecondary: 11,
 } as const

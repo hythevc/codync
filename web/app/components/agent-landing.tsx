@@ -18,10 +18,10 @@ export default function AgentLanding({ page }: { page: AgentPage }) {
     { icon: ChartBar, title: "Your limits at a glance", body: page.usage },
   ];
   const steps = [
-    ["Install Codync on your computer", "On a Mac, download the app or run brew install --cask leepokai/codync/codync. On Windows, run the installer. On Linux, use the install script."],
+    ["Install Squadbots on your computer", "On a Mac, download the app or run brew install --cask jaimedhenriques/squadbots/squadbots. On Windows, run the installer. On Linux, use the install script."],
     [`Sign in to ${agent} there`, page.login],
     [`Create a ${agent} bot`, `Pick ${agent} as the bot's agent and choose the folder it works in.`],
-    ["Pair your iPhone", "Get Codync from the App Store and scan the pairing code from the Mac menu bar, or the Windows or Linux app."],
+    ["Pair your iPhone", "Get Squadbots from the App Store and scan the pairing code from the Mac menu bar, or the Windows or Linux app."],
   ];
   const faqJsonLd = {
     "@context": "https://schema.org",
@@ -101,9 +101,9 @@ export default function AgentLanding({ page }: { page: AgentPage }) {
 
         <section className="px-4 pt-8 pb-24 sm:px-6">
           <p className="mx-auto max-w-6xl text-neutral-400">
-            Using more than {agent}? Codync runs Claude Code, Codex, Cursor, Gemini, Copilot and about 40 more agents.{" "}
+            Using more than {agent}? Squadbots runs Claude Code, Codex, Cursor, Gemini, Copilot and about 40 more agents.{" "}
             <Link href="/" className="text-neutral-200 underline underline-offset-4 hover:text-white">
-              See everything Codync does
+              See everything Squadbots does
             </Link>
             {" "}or{" "}
             <Link href="/compare" className="text-neutral-200 underline underline-offset-4 hover:text-white">
