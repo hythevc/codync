@@ -5,6 +5,6 @@
 	<key>clerkPublishableKey</key>
 	<string>pk_live_Y2xlcmsuY29keW5jLmRldiQ</string>
 	<key>cloudURL</key>
-	<string>https://api.codync.dev</string>
+	<string>https://api.squadbots.ai</string>
 </dict>
 </plist>

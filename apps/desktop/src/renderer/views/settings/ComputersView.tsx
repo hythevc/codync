@@ -40,11 +40,11 @@ export function ComputersView() {
 
         <div>
           <SectionHeader title="Over SSH">
-            {sshBridge() ? <IconButton title="Add SSH computer" icon="plus" onClick={() => setEditing({ profile: newSSHProfile(window.codync.hostPort), isNew: true })} /> : null}
+            {sshBridge() ? <IconButton title="Add SSH computer" icon="plus" onClick={() => setEditing({ profile: newSSHProfile(window.squadbots.hostPort), isNew: true })} /> : null}
           </SectionHeader>
           <Reveal show={sshState.state.profiles.length === 0}>
             <div style={{ ...font('callout'), color: 'var(--secondary)' }}>
-              Run bots on another computer you reach with SSH. It needs codync-host installed; your SSH keys stay on {thisMac}.
+              Run bots on another computer you reach with SSH. It needs squadbots-host installed; your SSH keys stay on {thisMac}.
             </div>
           </Reveal>
           {sshState.state.profiles.map((profile) => (
@@ -290,7 +290,7 @@ function ManagedComputerCard({ store, ssh: overSSH }: { store: BotStore; ssh: bo
       <Dialog
         open={confirmAutoApproval}
         title="Let account devices in without a code?"
-        message={`Any device signed in to your account gets full control of ${name}: its files, terminals and bots, with no check here. If someone gets into your account, or Codync's cloud is ever compromised, they could add their own device and you'd have no chance to stop it. Devices paired with a QR code aren't affected.`}
+        message={`Any device signed in to your account gets full control of ${name}: its files, terminals and bots, with no check here. If someone gets into your account, or Squadbots's cloud is ever compromised, they could add their own device and you'd have no chance to stop it. Devices paired with a QR code aren't affected.`}
         actions={[{ title: 'Skip the check', destructive: true, action: () => setApproval('auto') }]}
         onClose={() => setConfirmAutoApproval(false)}
       />
@@ -350,7 +350,7 @@ function PairingPanel({ store }: { store: BotStore }) {
             <img src={qr} alt={`Pairing code for ${name}`} width={200} height={200} style={{ display: 'block', imageRendering: 'pixelated' }} />
           </div>
           <div style={{ ...caption, color: 'var(--secondary)' }}>
-            Scan with the Codync app or the iPhone Camera. No Tailscale or open ports needed: your iPhone connects directly on the same Wi-Fi, and through the encrypted relay anywhere else.
+            Scan with the Squadbots app or the iPhone Camera. No Tailscale or open ports needed: your iPhone connects directly on the same Wi-Fi, and through the encrypted relay anywhere else.
           </div>
           {store.cloud?.enabled !== true ? (
             <div style={{ ...caption, color: 'var(--warning)' }}>
@@ -366,7 +366,7 @@ function PairingPanel({ store }: { store: BotStore }) {
               </span>
             ) : null}
             <IconButton title="New code" icon="arrow.clockwise" onClick={() => void load()} />
-            <IconButton title="Copy pairing link" icon="doc.on.doc" onClick={() => window.codync.app.copy(info.pairingUrl)} />
+            <IconButton title="Copy pairing link" icon="doc.on.doc" onClick={() => window.squadbots.app.copy(info.pairingUrl)} />
           </div>
         </>
       ) : error ? (
@@ -397,7 +397,7 @@ function SSHProfileEditor({ profile: initial, isNew }: { profile: SSHProfile; is
     const portText = port.trim()
     if (portText && !isInt(portText)) return setProblem('The SSH port must be a number.')
     const remote = remotePort.trim()
-    if (!isInt(remote)) return setProblem('The Codync port must be a number.')
+    if (!isInt(remote)) return setProblem('The Squadbots port must be a number.')
     const u = user.trim()
     const p: SSHProfile = {
       ...profile,
@@ -407,7 +407,7 @@ function SSHProfileEditor({ profile: initial, isNew }: { profile: SSHProfile; is
       port: portText ? Number(portText) : null,
       remotePort: Number(remote),
     }
-    const found = bridge ? await bridge.save(p) : 'SSH computers need a newer build of Codync.'
+    const found = bridge ? await bridge.save(p) : 'SSH computers need a newer build of Squadbots.'
     if (found) return setProblem(found)
     dismiss()
   }
@@ -444,10 +444,10 @@ function SSHProfileEditor({ profile: initial, isNew }: { profile: SSHProfile; is
               </span>
             ) : null}
           </div>
-          {field('Codync port', remotePort, setRemotePort, '')}
+          {field('Squadbots port', remotePort, setRemotePort, '')}
         </CardSection>
         <span style={{ ...font('caption'), color: 'var(--secondary)' }}>
-          Codync opens an SSH tunnel to codync-host on that computer's loopback. It uses your SSH config and ssh-agent; agent forwarding stays off.
+          Squadbots opens an SSH tunnel to squadbots-host on that computer's loopback. It uses your SSH config and ssh-agent; agent forwarding stays off.
         </span>
         <Reveal show={problem !== null}>
           <span style={{ ...font('caption'), color: 'var(--danger)' }}>{problem}</span>

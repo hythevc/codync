@@ -30,7 +30,7 @@ function computerName() {
 }
 
 // UI checks drive the renderer over the DevTools protocol (development builds only).
-if (!app.isPackaged && process.env.CODYNC_REMOTE_DEBUG) app.commandLine.appendSwitch('remote-debugging-port', process.env.CODYNC_REMOTE_DEBUG)
+if (!app.isPackaged && process.env.SQUADBOTS_REMOTE_DEBUG) app.commandLine.appendSwitch('remote-debugging-port', process.env.SQUADBOTS_REMOTE_DEBUG)
 
 const host = new HostController()
 const account = new AccountService()
@@ -70,8 +70,8 @@ function openChat() {
     titleBarStyle: isMac ? 'hidden' : 'default',
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: true, contextIsolation: true },
   })
-  // CODYNC_SHOW_INACTIVE: development and UI checks open the window without taking focus.
-  chat.on('ready-to-show', () => (process.env.CODYNC_SHOW_INACTIVE ? chat?.showInactive() : chat?.show()))
+  // SQUADBOTS_SHOW_INACTIVE: development and UI checks open the window without taking focus.
+  chat.on('ready-to-show', () => (process.env.SQUADBOTS_SHOW_INACTIVE ? chat?.showInactive() : chat?.show()))
   // Closing hides: the window keeps the stores (and the menu bar's data) alive.
   chat.on('close', (e) => quitLifecycle.closeToBackground(e, () => chat?.hide()))
   chat.on('closed', () => (chat = null))
@@ -143,7 +143,7 @@ function registerIPC(tray: Tray) {
   registerFileSaves()
   ipcMain.on('app:version', (e) => (e.returnValue = app.getVersion()))
   ipcMain.on('app:computerName', (e) => (e.returnValue = computerName()))
-  ipcMain.on('app:debugOpen', (e) => (e.returnValue = app.isPackaged ? null : (process.env.CODYNC_DEBUG_OPEN ?? null)))
+  ipcMain.on('app:debugOpen', (e) => (e.returnValue = app.isPackaged ? null : (process.env.SQUADBOTS_DEBUG_OPEN ?? null)))
   ipcMain.handle('host:snapshot', () => snapshot())
   ipcMain.handle('host:health', (_e, url: string) => fetchHealth(url))
   ipcMain.on('host:install', () => void host.install())

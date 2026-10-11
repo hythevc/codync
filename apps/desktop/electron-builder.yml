@@ -1,13 +1,13 @@
 # Packaging for macOS (DMG + zip for updates), Linux (AppImage, deb, tar.gz) and Windows (NSIS).
 # CI puts the native pieces in place first (see .github/workflows/release-desktop.yml):
-#   build/native/codync-host        the host for this platform (macOS: universal)
-#   build/native/codync-host.exe    Windows: the host, and codync-hostw.exe that runs it at sign-in
-#   build/native/codync-speech      macOS on-device speech helper
-#   build/native/CodyncScreen.app   macOS screen helper (Xcode `Screen` target, with cua-driver inside)
+#   build/native/squadbots-host        the host for this platform (macOS: universal)
+#   build/native/squadbots-host.exe    Windows: the host, and squadbots-hostw.exe that runs it at sign-in
+#   build/native/squadbots-speech      macOS on-device speech helper
+#   build/native/SquadbotsScreen.app   macOS screen helper (Xcode `Screen` target, with cua-driver inside)
 #   build/native/cua-driver.exe     Windows: the computer-use driver and its UI Automation helper
 beforePack: tools/verify-build.cjs
-appId: com.pokai.Codync
-productName: Codync
+appId: ai.squadbots.Squadbots
+productName: Squadbots
 copyright: ""
 directories:
   output: dist
@@ -21,12 +21,12 @@ extraResources:
   - from: resources/tray
     to: tray
 protocols:
-  - name: Codync
-    schemes: [codync, com.pokai.Codync]
+  - name: Squadbots
+    schemes: [squadbots, ai.squadbots.Squadbots]
 publish:
   provider: github
-  owner: leepokai
-  repo: Codync
+  owner: jaimedhenriques
+  repo: Squadbots
   releaseType: release
 
 mac:
@@ -39,11 +39,11 @@ mac:
     - target: zip
       arch: universal
   # The zip (update feed) takes this name; the DMG sets its own.
-  artifactName: codync-macos.${ext}
+  artifactName: squadbots-macos.${ext}
   hardenedRuntime: true
   # The computer-use driver keeps its maker's Developer ID signature (packaging/cua-driver).
   signIgnore:
-    - CodyncScreen\.app/Contents/Helpers/cua-driver$
+    - SquadbotsScreen\.app/Contents/Helpers/cua-driver$
   entitlements: resources/entitlements.mac.plist
   entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
@@ -51,22 +51,22 @@ mac:
     NSSpeechRecognitionUsageDescription: Your words are transcribed on this Mac and sent to your bot as a message.
     # generate_appcast signs the zip only when the app inside names this key (packaging/updates).
     SUPublicEDKey: /WvuKYw0ghkj3ExQbCejTquAcozuP1Llo2k8TIvx0Mc=
-  # The host ships inside the Mac app; Linux uses the installed codync-host (an AppImage's
+  # The host ships inside the Mac app; Linux uses the installed squadbots-host (an AppImage's
   # mount path changes every launch, so a service can't point into it).
   extraResources:
-    - from: build/native/codync-host
-      to: codync-host
-    - from: build/native/codync-speech
-      to: codync-speech
+    - from: build/native/squadbots-host
+      to: squadbots-host
+    - from: build/native/squadbots-speech
+      to: squadbots-speech
   extraFiles:
     # Registered with SMAppService.agent when Remote screen is turned on.
-    - from: build/native/CodyncScreen.app
-      to: Library/LoginItems/CodyncScreen.app
-    - from: resources/mac/com.pokai.Codync.screen.plist
-      to: Library/LaunchAgents/com.pokai.Codync.screen.plist
+    - from: build/native/SquadbotsScreen.app
+      to: Library/LoginItems/SquadbotsScreen.app
+    - from: resources/mac/ai.squadbots.Squadbots.screen.plist
+      to: Library/LaunchAgents/ai.squadbots.Squadbots.screen.plist
   notarize: true
 dmg:
-  artifactName: codync-macos.dmg
+  artifactName: squadbots-macos.dmg
   background: build/dmg-background.tiff
   window: { width: 660, height: 400 }
   iconSize: 128
@@ -78,27 +78,27 @@ dmg:
 linux:
   category: Development
   icon: resources/icon.png
-  executableName: codync
+  executableName: squadbots
   synopsis: Your coding agents as teammates
   target: [AppImage, deb, tar.gz]
-  artifactName: codync-linux-${arch}.${ext}
+  artifactName: squadbots-linux-${arch}.${ext}
   desktop:
     entry:
-      StartupWMClass: Codync
+      StartupWMClass: Squadbots
 
 win:
   icon: resources/icon.png
   target:
     - target: nsis
       arch: x64
-  artifactName: codync-windows-x64.${ext}
+  artifactName: squadbots-windows-x64.${ext}
   # The host ships inside the app, as on macOS: a per-user install keeps its path stable for
   # the sign-in entry that starts it.
   extraResources:
-    - from: build/native/codync-host.exe
-      to: codync-host.exe
-    - from: build/native/codync-hostw.exe
-      to: codync-hostw.exe
+    - from: build/native/squadbots-host.exe
+      to: squadbots-host.exe
+    - from: build/native/squadbots-hostw.exe
+      to: squadbots-hostw.exe
     # The computer-use driver bots act through; the host starts it from beside itself.
     - from: build/native/cua-driver.exe
       to: cua-driver.exe

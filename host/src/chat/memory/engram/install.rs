@@ -11,7 +11,7 @@ static INSTALL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 pub(super) async fn binary() -> Result<PathBuf> {
     #[cfg(test)]
-    if let Some(binary) = std::env::var_os("CODYNC_TEST_ENGRAM") {
+    if let Some(binary) = std::env::var_os("SQUADBOTS_TEST_ENGRAM") {
         return Ok(binary.into());
     }
     let _guard = INSTALL.lock().await;

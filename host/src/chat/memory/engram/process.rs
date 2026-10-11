@@ -62,7 +62,7 @@ impl Process {
                 json!({
                     "protocolVersion": crate::mcp::PROTOCOL_VERSION,
                     "capabilities": {},
-                    "clientInfo": {"name": "codync", "version": env!("CARGO_PKG_VERSION")},
+                    "clientInfo": {"name": "squadbots", "version": env!("CARGO_PKG_VERSION")},
                 }),
             )
             .await?;
@@ -71,7 +71,7 @@ impl Process {
             .request(
                 "tools/call",
                 json!({"name":"mem_session_start", "arguments":{
-                    "id": format!("{project}:codync-background"), "directory": dir,
+                    "id": format!("{project}:squadbots-background"), "directory": dir,
                 }}),
             )
             .await?;
@@ -195,10 +195,10 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[ignore = "requires the pinned release binary at CODYNC_TEST_ENGRAM"]
+    #[ignore = "requires the pinned release binary at SQUADBOTS_TEST_ENGRAM"]
     async fn native_memory_survives_restart_and_cannot_read_another_bot() {
-        let binary = std::env::var("CODYNC_TEST_ENGRAM").expect("set CODYNC_TEST_ENGRAM");
-        let root = std::env::temp_dir().join(format!("codync-engram-test-{}", uuid::Uuid::new_v4()));
+        let binary = std::env::var("SQUADBOTS_TEST_ENGRAM").expect("set SQUADBOTS_TEST_ENGRAM");
+        let root = std::env::temp_dir().join(format!("squadbots-engram-test-{}", uuid::Uuid::new_v4()));
         let result = async {
             let mut a = Process::start(Path::new(&binary), &root.join("a"), "bot-a").await?;
             let saved = a

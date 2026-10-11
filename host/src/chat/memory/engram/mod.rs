@@ -1,5 +1,5 @@
 //! Pinned Engram runtime. Each bot owns a separate database and stdio process.
-//! Engram owns schema migrations and every write; Codync never writes its tables.
+//! Engram owns schema migrations and every write; Squadbots never writes its tables.
 
 mod backup;
 mod clear;
@@ -26,7 +26,7 @@ pub fn directory(bot_id: &str) -> Result<PathBuf> {
     #[cfg(test)]
     let root = {
         static ROOT: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
-            std::env::temp_dir().join(format!("codync-memory-unit-{}", uuid::Uuid::new_v4()))
+            std::env::temp_dir().join(format!("squadbots-memory-unit-{}", uuid::Uuid::new_v4()))
         });
         ROOT.join(tokio::runtime::Handle::try_current()?.id().to_string())
     };
@@ -34,5 +34,5 @@ pub fn directory(bot_id: &str) -> Result<PathBuf> {
 }
 
 pub fn project(bot_id: &str) -> String {
-    format!("codync-{bot_id}")
+    format!("squadbots-{bot_id}")
 }

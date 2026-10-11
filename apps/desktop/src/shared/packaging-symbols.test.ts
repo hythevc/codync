@@ -8,11 +8,11 @@ import { test, type TestContext } from 'node:test'
 const verifyBuild = createRequire(import.meta.url)('../../tools/verify-build.cjs')
 
 function fixture(t: TestContext, platform = 'darwin') {
-  const projectDir = mkdtempSync(join(tmpdir(), 'codync-symbol-check-'))
+  const projectDir = mkdtempSync(join(tmpdir(), 'squadbots-symbol-check-'))
   t.after(() => rmSync(projectDir, { recursive: true, force: true }))
   mkdirSync(join(projectDir, 'resources'))
   writeFileSync(join(projectDir, 'resources/account-config.json'), JSON.stringify({ environment: 'dev' }))
-  return { electronPlatformName: platform, packager: { projectDir, appInfo: { id: 'com.pokai.Codync.dev' } } }
+  return { electronPlatformName: platform, packager: { projectDir, appInfo: { id: 'ai.squadbots.Squadbots.dev' } } }
 }
 
 test('macOS packaging requires the Apple logo manifest entry and every rendered weight', async (t) => {

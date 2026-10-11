@@ -30,14 +30,14 @@ impl Drop for Host {
 
 impl Host {
     async fn start() -> Self {
-        assert!(std::env::var_os("CODYNC_TEST_ENGRAM").is_some(), "set CODYNC_TEST_ENGRAM to the pinned binary");
-        let home = std::env::temp_dir().join(format!("codync-memory-e2e-{}", uuid::Uuid::new_v4()));
+        assert!(std::env::var_os("SQUADBOTS_TEST_ENGRAM").is_some(), "set SQUADBOTS_TEST_ENGRAM to the pinned binary");
+        let home = std::env::temp_dir().join(format!("squadbots-memory-e2e-{}", uuid::Uuid::new_v4()));
         common::seed_memory_runtime(&home);
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-        let child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+        let child = Command::new(env!("CARGO_BIN_EXE_squadbots-host"))
             .args(["serve", "--bind", "127.0.0.1", "--port", &port.to_string()])
-            .env("CODYNC_HOME", &home)
-            .env("CODYNC_CLOUD", "off")
+            .env("SQUADBOTS_HOME", &home)
+            .env("SQUADBOTS_CLOUD", "off")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -74,7 +74,7 @@ impl Host {
 }
 
 #[tokio::test]
-#[ignore = "requires the pinned Engram release at CODYNC_TEST_ENGRAM"]
+#[ignore = "requires the pinned Engram release at SQUADBOTS_TEST_ENGRAM"]
 async fn migrate_manage_backup_and_forget_without_cross_bot_reads() {
     let host = Host::start().await;
     let a = host.bot("Memory A").await;
@@ -86,7 +86,7 @@ async fn migrate_manage_backup_and_forget_without_cross_bot_reads() {
         writeln!(facts, "- (2026-01-01) 台灣繁體中文偏好 {i}").unwrap();
     }
     std::fs::write(legacy.join("profile.md"), &facts).unwrap();
-    std::fs::write(legacy.join("log/2026-02.md"), "- (2026-02-02) 發布 Codync\n").unwrap();
+    std::fs::write(legacy.join("log/2026-02.md"), "- (2026-02-02) 發布 Squadbots\n").unwrap();
 
     let first = host.call("memory", json!({"botId":a,"offset":0})).await;
     assert_eq!(first["total"], 66);
@@ -115,7 +115,7 @@ async fn migrate_manage_backup_and_forget_without_cross_bot_reads() {
     assert_eq!(backup["observations"].as_array().unwrap().len(), 66);
     host.call("forgetMemory", json!({"botId":a,"id":id})).await;
     assert_eq!(host.call("memory", json!({"botId":a,"filter":"pinned"})).await["total"], 0);
-    let native_session = format!("codync-{a}:codync-background");
+    let native_session = format!("squadbots-{a}:squadbots-background");
     let prompt = host.call("memoryCall", json!({"botId":a,"name":"mem_save_prompt","arguments":{"session_id":native_session,"content":"UNIQUE_SECRET_CAPTURE"}})).await;
     assert_ne!(prompt["isError"], true);
     host.call("clearMemory", json!({"botId":a})).await;
@@ -135,7 +135,7 @@ async fn migrate_manage_backup_and_forget_without_cross_bot_reads() {
 }
 
 #[tokio::test]
-#[ignore = "requires the pinned Engram release at CODYNC_TEST_ENGRAM"]
+#[ignore = "requires the pinned Engram release at SQUADBOTS_TEST_ENGRAM"]
 async fn large_backups_round_trip_through_chunked_transport() {
     let host = Host::start().await;
     let bot = host.bot("Large backup").await;
@@ -180,13 +180,13 @@ async fn large_backups_round_trip_through_chunked_transport() {
     let exported: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(exported["observations"].as_array().unwrap().len(), 80);
     for fact in exported["observations"].as_array().unwrap() {
-        assert_eq!(fact["project"], format!("codync-{bot}"));
+        assert_eq!(fact["project"], format!("squadbots-{bot}"));
         assert!(fact["content"].as_str().unwrap().len() > 9_000);
     }
 }
 
 #[tokio::test]
-#[ignore = "requires the pinned Engram release at CODYNC_TEST_ENGRAM"]
+#[ignore = "requires the pinned Engram release at SQUADBOTS_TEST_ENGRAM"]
 async fn new_session_flushes_automatic_facts_and_native_summary() {
     let host = Host::start().await;
     let agent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/memory_agent.py");

@@ -179,7 +179,7 @@ pub fn spawn_worker(port: u16, force: bool, skip_app_check: bool) -> Result<()> 
     install::require_standalone(&executable)?;
     ensure!(
         service::installed(),
-        "background updates require an installed host service; run `codync-host update` in a terminal"
+        "background updates require an installed host service; run `squadbots-host update` in a terminal"
     );
     service::require_executable(&executable)?;
     let mut args = vec!["update".to_owned(), "--worker".to_owned(), "--port".to_owned(), port.to_string()];
@@ -212,23 +212,23 @@ fn spawn_job(executable: &Path, args: &[String]) -> Result<()> {
     if cfg!(target_os = "linux") {
         command = std::process::Command::new("systemd-run");
         command
-            .args(["--user", "--collect", "--unit=codync-host-update", "--property=Type=exec"])
-            .arg(format!("--setenv=CODYNC_HOME={}", service::data_dir().display()))
+            .args(["--user", "--collect", "--unit=squadbots-host-update", "--property=Type=exec"])
+            .arg(format!("--setenv=SQUADBOTS_HOME={}", service::data_dir().display()))
             .arg("--")
             .arg(executable)
             .args(args);
     } else {
         // submit jobs do not restart on exit. Remove only a completed old job;
         // an active worker holds update.lock, acquired by our caller above.
-        let _ = std::process::Command::new("launchctl").args(["remove", "com.pokai.codync.update"]).output();
+        let _ = std::process::Command::new("launchctl").args(["remove", "ai.squadbots.squadbots.update"]).output();
         command = std::process::Command::new("launchctl");
         command
-            .args(["submit", "-l", "com.pokai.codync.update", "-o"])
+            .args(["submit", "-l", "ai.squadbots.squadbots.update", "-o"])
             .arg(service::data_dir().join("update.log"))
             .arg("-e")
             .arg(service::data_dir().join("update.log"))
             .args(["--", "/usr/bin/env"])
-            .arg(format!("CODYNC_HOME={}", service::data_dir().display()))
+            .arg(format!("SQUADBOTS_HOME={}", service::data_dir().display()))
             .arg(executable)
             .args(args);
     }

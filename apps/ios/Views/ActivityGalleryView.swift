@@ -1,6 +1,6 @@
 import ActivityKit
-import CodyncKit
-import CodyncUI
+import SquadbotsKit
+import SquadbotsUI
 import SwiftUI
 
 struct ActivityGalleryView: View {
@@ -35,7 +35,7 @@ struct ActivityGalleryView: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle(island ? "Show in Dynamic Island" : "Show Live Activities", isOn: $enabled)
-                        .toggleStyle(.codync)
+                        .toggleStyle(.squadbots)
                         .font(.subheadline.weight(.medium))
                     Text(island
                          ? "The Dynamic Island shows the same Live Activity as the Lock Screen, so this switch turns off both."
@@ -76,7 +76,7 @@ struct ActivityGalleryView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     ForEach(forms, id: \.self) { explanation($0) }
                 }
-                Text("iOS chooses the presentation based on your device and other active tasks. These previews don't start a Live Activity. Approvals are handled inside Codync.")
+                Text("iOS chooses the presentation based on your device and other active tasks. These previews don't start a Live Activity. Approvals are handled inside Squadbots.")
                     .font(.footnote).foregroundStyle(Palette.secondary)
             }
             .padding(18).frame(maxWidth: 560).frame(maxWidth: .infinity)
@@ -124,7 +124,7 @@ struct LockWidgetGalleryView: View {
                             .environment(\.colorScheme, .dark)
                     }
                 }
-                Text("Touch and hold your Lock Screen → Customize → Lock Screen. Tap the widget area and choose Codync. Inline widgets go in the date row above the clock.")
+                Text("Touch and hold your Lock Screen → Customize → Lock Screen. Tap the widget area and choose Squadbots. Inline widgets go in the date row above the clock.")
                     .font(.footnote).foregroundStyle(Palette.secondary)
                 Text("Choose Bots for task status or Usage limits for the highest reported limit. iOS applies your Lock Screen's color and style.")
                     .font(.footnote).foregroundStyle(Palette.secondary)

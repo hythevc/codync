@@ -190,9 +190,9 @@ export const SCREENSHOT_FONTS: Record<ScreenshotFontId, { name: string; family: 
 };
 
 export const THEMES: Record<string, Theme> = {
-  "codync-halftone": {
-    id: "codync-halftone",
-    name: "Codync Halftone",
+  "squadbots-halftone": {
+    id: "squadbots-halftone",
+    name: "Squadbots Halftone",
     bg: "#000000",
     bgAlt: "#FFFFFF",
     fg: "#FFFFFF",

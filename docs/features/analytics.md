@@ -1,6 +1,6 @@
 # Usage analytics
 
-Opt-in product analytics in PostHog (US Cloud, project "Codync App", id 649427). Every
+Opt-in product analytics in PostHog (US Cloud, project "Squadbots App", id 649427). Every
 device asks once and sends nothing until the user agrees; the answer can be changed in
 Settings anytime. The public promise lives in `web/app/privacy/page.tsx`: keep it true.
 
@@ -12,7 +12,7 @@ Settings anytime. The public promise lives in `web/app/privacy/page.tsx`: keep i
 - **Consent per device.** The computer's owner decides for that computer (host kv
   `analytics_enabled`, `null` until asked); each iPhone decides for itself
   (`UserDefaults` `analyticsEnabled`). Turning it off drops anything still queued.
-- **Identity.** Signed in to a Codync account: the Clerk user id, with a person profile.
+- **Identity.** Signed in to a Squadbots account: the Clerk user id, with a person profile.
   Otherwise a random install id (the host id on a computer, a UUID on the iPhone) and no
   person profile. The first signed-in event sends `$identify` with `$anon_distinct_id` so
   earlier events join the account.
@@ -30,13 +30,13 @@ Settings anytime. The public promise lives in `web/app/privacy/page.tsx`: keep i
 - **Desktop and terminal UI** report app-level events through the loopback-only `track`
   method (`app_opened`, `onboarding_completed`, `signed_in`, `signed_out`) and set consent
   with `setAnalytics`; `hello` carries `analytics: true | false | null`.
-- **iPhone** (`CodyncKit` analytics client, no SDK) sends its own app-level events
+- **iPhone** (`SquadbotsKit` analytics client, no SDK) sends its own app-level events
   (`app_opened`, `onboarding_completed`, `computer_paired`, `signed_in`, `signed_out`,
   `voice_call_started`) straight to PostHog. Widgets and the notification extension never send.
 
 ## Asking
 
-All clients show the same prompt ("Help improve Codync", *Share usage* / *Don't share*)
+All clients show the same prompt ("Help improve Squadbots", *Share usage* / *Don't share*)
 when onboarding is done and the device hasn't answered, which covers new users right after
 the welcome screen and existing users once after updating. The App Store privacy label
 declares *Product Interaction*, linked to the user, not used for tracking.

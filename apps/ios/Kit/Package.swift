@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "CodyncKit",
+    name: "SquadbotsKit",
     platforms: [.iOS(.v18)],
     products: [
-        .library(name: "CodyncKit", targets: ["CodyncKit"]),
-        .library(name: "CodyncUI", targets: ["CodyncUI"]),
+        .library(name: "SquadbotsKit", targets: ["SquadbotsKit"]),
+        .library(name: "SquadbotsUI", targets: ["SquadbotsUI"]),
     ],
     dependencies: [
         // libwebrtc for the remote screen viewer (hardware H.264 over WebRTC) and realtime voice calls.
@@ -16,17 +16,17 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.18.0"),
     ],
     targets: [
-        .target(name: "CodyncKit", resources: [.copy("Resources/ThirdPartyNotices"), .process("Resources/ProviderIcons.xcassets")]),
+        .target(name: "SquadbotsKit", resources: [.copy("Resources/ThirdPartyNotices"), .process("Resources/ProviderIcons.xcassets")]),
         .target(
-            name: "CodyncUI",
+            name: "SquadbotsUI",
             dependencies: [
-                "CodyncKit",
+                "SquadbotsKit",
                 .product(name: "WebRTC", package: "WebRTC"),
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
             ],
             resources: [.process("Resources")]
         ),
-        .testTarget(name: "CodyncKitTests", dependencies: ["CodyncKit"], resources: [.copy("Fixtures")]),
-        .testTarget(name: "CodyncUITests", dependencies: ["CodyncUI", "CodyncKit"]),
+        .testTarget(name: "SquadbotsKitTests", dependencies: ["SquadbotsKit"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "SquadbotsUITests", dependencies: ["SquadbotsUI", "SquadbotsKit"]),
     ]
 )

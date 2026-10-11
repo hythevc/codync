@@ -20,12 +20,12 @@ export function VoiceChatSettingsView({ showsHeader = true }: { showsHeader?: bo
   const [engine, setEngine] = usePref(voice.engine)
   const [rate, setRate] = usePref(voice.rate)
   const [language, setLanguage] = usePref(voice.language)
-  const languages = useMemo(() => voice.languageOptions(window.codync.speech.locales()), [])
+  const languages = useMemo(() => voice.languageOptions(window.squadbots.speech.locales()), [])
   const provider = voice.isVoiceProvider(engine) ? engine : null
   const [mode, setMode] = usePref(voice.mode(provider ?? 'openai'))
   const footer = provider
     ? `Your own ${voice.voiceInfo[provider].name} key, billed by ${voice.voiceInfo[provider].name}. Applies from the next call.`
-    : window.codync.speech.available
+    : window.squadbots.speech.available
       ? 'On-device speech, on this computer. Applies from the next call.'
       : onDeviceUnavailableReason()
   return (
@@ -38,7 +38,7 @@ export function VoiceChatSettingsView({ showsHeader = true }: { showsHeader?: bo
               <ValueRow key="engine" label="Engine">
                 <ChoicePicker
                   selection={engine}
-                  options={[...(window.codync.speech.available || engine === 'device' ? [{ id: 'device', label: 'On device' }] : []), ...voice.VOICE_PROVIDERS.map((p) => ({ id: p, label: voice.voiceInfo[p].name }))]}
+                  options={[...(window.squadbots.speech.available || engine === 'device' ? [{ id: 'device', label: 'On device' }] : []), ...voice.VOICE_PROVIDERS.map((p) => ({ id: p, label: voice.voiceInfo[p].name }))]}
                   onChange={setEngine}
                 />
               </ValueRow>,
@@ -241,7 +241,7 @@ function ProviderVoiceSettings({ provider }: { provider: VoiceProvider }) {
             )}
           </div>
           <div className="settings-row" style={font('footnote')}>
-            <button style={{ color: 'var(--text)', textDecoration: 'underline' }} onClick={() => window.codync.app.openExternal(info.keyPage)}>
+            <button style={{ color: 'var(--text)', textDecoration: 'underline' }} onClick={() => window.squadbots.app.openExternal(info.keyPage)}>
               Get a key from {info.name}
             </button>
             <span style={{ flex: 1 }} />

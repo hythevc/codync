@@ -1,12 +1,12 @@
-# homebrew-codync
+# homebrew-squadbots
 
-Homebrew tap for [Codync](https://github.com/leepokai/Codync): message the coding agents on your computer as bots from iPhone, Mac, Linux or the terminal.
+Homebrew tap for [Squadbots](https://github.com/jaimedhenriques/squadbots): message the coding agents on your computer as bots from iPhone, Mac, Linux or the terminal.
 
 ```sh
-brew install --cask leepokai/codync/codync      # Mac app (the host ships inside)
-brew install leepokai/codync/codync-host        # host only: Linux, headless Macs
+brew install --cask jaimedhenriques/squadbots/squadbots      # Mac app (the host ships inside)
+brew install jaimedhenriques/squadbots/squadbots-host        # host only: Linux, headless Macs
 ```
 
-Or without Homebrew: `curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh`
+Or without Homebrew: `curl -fsSL https://raw.githubusercontent.com/jaimedhenriques/squadbots/main/packaging/install.sh | sh`
 
-Generated from [`packaging/homebrew`](https://github.com/leepokai/Codync/tree/main/packaging/homebrew) by the release workflows in the Codync repo; edit the templates there, not this repo.
+Generated from [`packaging/homebrew`](https://github.com/jaimedhenriques/squadbots/tree/main/packaging/homebrew) by the release workflows in the Squadbots repo; edit the templates there, not this repo.

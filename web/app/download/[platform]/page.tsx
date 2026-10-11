@@ -30,10 +30,10 @@ export default async function DownloadPage({ params }: { params: Promise<{ platf
         <div className="relative mx-auto flex max-w-xl flex-col items-center text-center">
           <p className="text-sm text-neutral-500">Your download is starting…</p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tighter text-neutral-50 md:text-5xl">
-            Enjoying Codync? Give it a star.
+            Enjoying Squadbots? Give it a star.
           </h1>
           <p className="mt-4 text-neutral-400">
-            Codync is free and open source. A star on GitHub is the easiest way to help other people find it.
+            Squadbots is free and open source. A star on GitHub is the easiest way to help other people find it.
           </p>
           <div className="mt-8">
             <GitHubStarButton />

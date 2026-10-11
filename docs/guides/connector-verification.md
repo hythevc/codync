@@ -8,7 +8,7 @@ python3 tools/check-connectors.py --network --slow
 ```
 
 The script starts the built host on an ephemeral loopback port with a temporary
-`CODYNC_HOME` and cloud access disabled. It uses a separate real Keychain key,
+`SQUADBOTS_HOME` and cloud access disabled. It uses a separate real Keychain key,
 stops its host and MCP proxies, deletes that key, and removes its data directory.
 It does not change existing bots, connectors or third-party accounts. npm may
 retain downloaded packages in its normal cache. Requires Python 3, Node/npm,
@@ -26,7 +26,7 @@ The timeout check returned after 90.0 seconds and confirmed the child had exited
 The script successfully removed its temporary host data and Keychain entry.
 
 Also passed `cargo build`, the 26 non-ignored `market::` unit tests, and
-`cargo test --bin codync-host platform_keyring_roundtrip -- --ignored --nocapture`.
+`cargo test --bin squadbots-host platform_keyring_roundtrip -- --ignored --nocapture`.
 The latter explicitly runs the OS-keychain test skipped by the normal suite.
 Python syntax compilation and whitespace checks passed. This is evidence for
 the current local worktree, which includes unrelated uncommitted changes; it is

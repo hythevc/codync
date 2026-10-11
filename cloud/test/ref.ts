@@ -1,4 +1,4 @@
-// Reference device/host crypto for the Codync relay protocol (spec §4–§7), built on @noble/*.
+// Reference device/host crypto for the Squadbots relay protocol (spec §4–§7), built on @noble/*.
 // Test-only: checked against docs/reference/fixtures/remote-relay-vectors.json, then used by the unit tests and the e2e harness.
 // Runs in both workerd (vitest) and Node (e2e).
 

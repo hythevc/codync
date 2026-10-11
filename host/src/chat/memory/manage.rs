@@ -141,7 +141,7 @@ fn save(memory: &Memory, args: &Value) -> Result<Value> {
     } else {
         fields["project"] = memory.project().into();
         fields["capture_prompt"] = false.into();
-        fields["session_id"] = format!("{}:codync-background", memory.project()).into();
+        fields["session_id"] = format!("{}:squadbots-background", memory.project()).into();
         "mem_save"
     };
     Ok(payload(&memory.tool(name, &fields)?))

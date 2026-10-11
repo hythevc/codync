@@ -11,14 +11,14 @@ export default function Privacy() {
         <p className="text-neutral-400 text-sm">Last updated: October 8, 2026</p>
 
         <Section title="Overview">
-          Codync lets you message the AI agents that run on your own computer. It is built so that your files, conversations and credentials stay on your devices.
+          Squadbots lets you message the AI agents that run on your own computer. It is built so that your files, conversations and credentials stay on your devices.
         </Section>
 
         <Section title="What stays on your devices">
           <ul className="list-disc pl-5 space-y-2">
-            <li><strong>Bots and conversations</strong> are stored by the Codync host on your computer (in <code>~/.codync</code>). Your phone keeps a cache so the app opens instantly.</li>
-            <li><strong>Your phone talks directly to your computer</strong> over your local network or Tailscale. There is no Codync server in between and no Codync account.</li>
-            <li><strong>Agents run with your own logins</strong> (Claude Code, Codex, Cursor and others). Codync never sees or stores their credentials.</li>
+            <li><strong>Bots and conversations</strong> are stored by the Squadbots host on your computer (in <code>~/.squadbots</code>). Your phone keeps a cache so the app opens instantly.</li>
+            <li><strong>Your phone talks directly to your computer</strong> over your local network or Tailscale. There is no Squadbots server in between and no Squadbots account.</li>
+            <li><strong>Agents run with your own logins</strong> (Claude Code, Codex, Cursor and others). Squadbots never sees or stores their credentials.</li>
             <li><strong>Usage limits</strong> are read locally from the agents installed on your computer. Only percentages reach your phone.</li>
           </ul>
         </Section>
@@ -34,10 +34,10 @@ export default function Privacy() {
           <ul className="list-disc pl-5 space-y-2">
             <li><strong>What we record:</strong> which features you use, such as opening the app, creating or deleting a bot, sending a message (with the number of attachments, not the files), starting a routine or a voice call, and installing a connector from the catalog. Each event carries the app version, the platform and the agent and model a bot uses.</li>
             <li><strong>What we never record:</strong> your messages, prompts, code, files, file names or paths, bot names, credentials or anything your agents produce. We don&apos;t store your IP address or location.</li>
-            <li><strong>Who it&apos;s linked to:</strong> your Codync account when you&apos;re signed in; otherwise a random ID created on that device.</li>
-            <li><strong>Why:</strong> only to understand how people use Codync and improve it. It is never sold, never shared for advertising and never used to track you across other apps or websites.</li>
+            <li><strong>Who it&apos;s linked to:</strong> your Squadbots account when you&apos;re signed in; otherwise a random ID created on that device.</li>
+            <li><strong>Why:</strong> only to understand how people use Squadbots and improve it. It is never sold, never shared for advertising and never used to track you across other apps or websites.</li>
           </ul>
-          <p className="mt-2">Codync has no advertising identifiers.</p>
+          <p className="mt-2">Squadbots has no advertising identifiers.</p>
         </Section>
 
         <Section title="Third-party services">
@@ -48,15 +48,15 @@ export default function Privacy() {
             <li><strong>The AI agents you choose</strong>: they run on your computer under their own terms and privacy policies.</li>
             <li><strong>OpenAI or Google (optional, voice calls)</strong>: only if you add your own OpenAI or Gemini API key in a call&apos;s settings. Your voice then goes from your iPhone or Mac directly to that provider, under your account and its privacy policy, together with the bot&apos;s name and description and the chat messages it asks for during the call. The key is stored encrypted on your computer, which uses it only to start calls and list models. Without a key, voice calls use Apple speech recognition on your device.</li>
           </ul>
-          <p className="mt-2">This policy covers Codync as we publish it. Codync services run by third parties (for example a hosted host or relay) handle your data under their own privacy policies; we don&apos;t operate them and receive none of that data.</p>
+          <p className="mt-2">This policy covers Squadbots as we publish it. Squadbots services run by third parties (for example a hosted host or relay) handle your data under their own privacy policies; we don&apos;t operate them and receive none of that data.</p>
         </Section>
 
         <Section title="Data retention">
-          Everything lives on your devices. Delete a bot to remove its conversation; uninstall the host and delete <code>~/.codync</code> to remove all of it. Deleting the iPhone app removes its cache. Turning analytics off stops new events from being sent.
+          Everything lives on your devices. Delete a bot to remove its conversation; uninstall the host and delete <code>~/.squadbots</code> to remove all of it. Deleting the iPhone app removes its cache. Turning analytics off stops new events from being sent.
         </Section>
 
         <Section title="Children's privacy">
-          Codync is not directed at children under the age of 13.
+          Squadbots is not directed at children under the age of 13.
         </Section>
 
         <Section title="Changes">
@@ -65,7 +65,7 @@ export default function Privacy() {
 
         <Section title="Contact">
           Questions? Open an issue at{" "}
-          <a href="https://github.com/leepokai/Codync/issues" className="text-white underline">github.com/leepokai/Codync/issues</a>.
+          <a href="https://github.com/jaimedhenriques/squadbots/issues" className="text-white underline">github.com/jaimedhenriques/squadbots/issues</a>.
         </Section>
 
         <div className="pt-4">

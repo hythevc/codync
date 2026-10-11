@@ -150,7 +150,7 @@ export function SkillGlyph({ size }: { size?: number }) {
 /** Text that opens a web page (replaces the system `Link`). */
 export function WebLink({ title, url, style }: { title: string; url: string; style?: CSSProperties }) {
   return (
-    <button className="plain-link" style={style} title={url} onClick={() => window.codync.app.openExternal(url)}>
+    <button className="plain-link" style={style} title={url} onClick={() => window.squadbots.app.openExternal(url)}>
       {title}
     </button>
   )
@@ -243,7 +243,7 @@ export function useWindowHeight() {
   return height
 }
 
-/** A Marketplace form in its own modal card (`.codyncSheet`), sized like the Mac's. */
+/** A Marketplace form in its own modal card (`.squadbotsSheet`), sized like the Mac's. */
 export function FormSheet({ open, onClose, width = 520, height = 600, children }: { open: boolean; onClose: () => void; width?: number; height?: number; children: ReactNode }) {
   const windowHeight = useWindowHeight()
   return (

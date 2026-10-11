@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import SquadbotsKit
+import SquadbotsUI
 import SwiftUI
 
 /// Usage limits (opened from the State tab): one card per provider, the tightest limit as a big bar, every limit listed below.

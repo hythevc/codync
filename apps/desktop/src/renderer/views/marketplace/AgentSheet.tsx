@@ -54,7 +54,7 @@ function TintedAgentIcon({ registry, size }: { registry?: string | null; size: n
 
 /**
  * Getting an agent ready on the computer: install it, then sign in. Sign-in
- * options come from the agent itself (ACP), plus Codync's own command for
+ * options come from the agent itself (ACP), plus Squadbots's own command for
  * CLIs it knows. Bots are made from New chat, not here.
  */
 export function AgentSheet({ initial }: { initial: Backend }) {

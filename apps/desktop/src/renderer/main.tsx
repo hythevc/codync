@@ -8,8 +8,8 @@ import { applyTextSize, prefs } from './lib/prefs'
 import { account } from './store/account'
 
 const page = new URLSearchParams(location.search).get('window') ?? 'chat'
-document.title = window.codync.appName
-document.documentElement.dataset.platform = window.codync.platform
+document.title = window.squadbots.appName
+document.documentElement.dataset.platform = window.squadbots.platform
 applyTextSize(prefs.textSize.get())
 
 // The pairing window only needs this computer's host, not a mirror of its bots.

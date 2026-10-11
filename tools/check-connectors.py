@@ -3,7 +3,7 @@
 
 Run cargo build in host first, then python3 tools/check-connectors.py.
 Add --network to also install a pinned npm MCP and contact DeepWiki/Registry.
-No existing Codync data or third-party accounts are used. Tool calls only read
+No existing Squadbots data or third-party accounts are used. Tool calls only read
 test files or public documentation. The temporary Keychain entry is removed.
 """
 import argparse
@@ -27,7 +27,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = Path(__file__).resolve().parents[1]
-BINARY = ROOT / "host/target/debug/codync-host"
+BINARY = ROOT / "host/target/debug/squadbots-host"
 SECRET = "connector-check-disposable-key"
 
 
@@ -189,9 +189,9 @@ def main():
             results.append((name, False))
             print(f"FAIL {name}: {error}", flush=True)
 
-    with tempfile.TemporaryDirectory(prefix="codync-connectors-check-") as temp:
+    with tempfile.TemporaryDirectory(prefix="squadbots-connectors-check-") as temp:
         home = Path(temp)
-        env = {**os.environ, "CODYNC_HOME": str(home), "CODYNC_CLOUD": "off"}
+        env = {**os.environ, "SQUADBOTS_HOME": str(home), "SQUADBOTS_CLOUD": "off"}
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
@@ -239,7 +239,7 @@ def main():
                 listing = json.dumps(api("connectors"))
                 assert "test-private-key" not in listing
                 assert "credential_mcp.py" not in listing
-                with sqlite3.connect(home / "codync.db") as db:
+                with sqlite3.connect(home / "squadbots.db") as db:
                     raw = db.execute("SELECT v FROM kv WHERE k='connectors'").fetchone()[0]
                     assert raw.startswith("vault:v1:") and "test-private-key" not in raw
             check("listings redact secrets and SQLite stores ciphertext", redaction)
@@ -357,11 +357,11 @@ def main():
             remote.shutdown()
             remote.server_close()
             log.close()
-            if (home / "codync.db").exists():
-                with sqlite3.connect(home / "codync.db") as db:
+            if (home / "squadbots.db").exists():
+                with sqlite3.connect(home / "squadbots.db") as db:
                     row = db.execute("SELECT v FROM kv WHERE k='vault.id'").fetchone()
                 if row:
-                    removed = subprocess.run(["security", "delete-generic-password", "-s", "dev.codync.credentials", "-a", row[0]], capture_output=True)
+                    removed = subprocess.run(["security", "delete-generic-password", "-s", "dev.squadbots.credentials", "-a", row[0]], capture_output=True)
                     assert removed.returncode == 0, "Could not remove temporary Keychain entry: " + row[0]
             print("Temporary host, data and Keychain key cleaned up.", flush=True)
     failed = sum(not ok for _, ok in results)

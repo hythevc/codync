@@ -1,4 +1,4 @@
-//! End to end: a real `codync-host serve` driving a scripted ACP agent
+//! End to end: a real `squadbots-host serve` driving a scripted ACP agent
 //! (`fake_agent.py`) through a full turn with an approval in the middle.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: failing loudly is the point
@@ -36,14 +36,14 @@ fn free_port() -> u16 {
 }
 
 async fn start_host() -> Host {
-    let home = std::env::temp_dir().join(format!("codync-e2e-{}", uuid::Uuid::new_v4()));
+    let home = std::env::temp_dir().join(format!("squadbots-e2e-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&home).unwrap();
     common::seed_memory_runtime(&home);
     let port = free_port();
-    let child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+    let child = Command::new(env!("CARGO_BIN_EXE_squadbots-host"))
         .args(["serve", "--bind", "127.0.0.1", "--port", &port.to_string()])
-        .env("CODYNC_HOME", &home)
-        .env("CODYNC_CLOUD", "off")
+        .env("SQUADBOTS_HOME", &home)
+        .env("SQUADBOTS_CLOUD", "off")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -93,7 +93,7 @@ async fn health_names_this_binary() {
     let health: Value = reqwest::get(format!("{}/health", host.base)).await.unwrap().json().await.unwrap();
     assert!(health["binaryHash"].as_str().is_some_and(|hash| hash.len() == 64));
     // The apps compare it with the path they resolve, which on Windows has no `\\?\` prefix.
-    let exe = std::fs::canonicalize(env!("CARGO_BIN_EXE_codync-host")).unwrap();
+    let exe = std::fs::canonicalize(env!("CARGO_BIN_EXE_squadbots-host")).unwrap();
     let exe = exe.to_str().unwrap();
     assert_eq!(health["binaryPath"], exe.strip_prefix(r"\\?\").unwrap_or(exe));
 }
@@ -431,7 +431,7 @@ async fn personal_workspaces_are_unique_persistent_and_optional() {
 /// stream after a full turn. Values aren't kept, only the shape.
 const WIRE_SHAPE: &str = "tests/fixtures/wire-shape.json";
 /// Re-records the snapshot (refused while a field is removed or retyped without a new `minApp`).
-const UPDATE_ENV: &str = "CODYNC_UPDATE_WIRE_SHAPE";
+const UPDATE_ENV: &str = "SQUADBOTS_UPDATE_WIRE_SHAPE";
 /// Depends on the machine (installed harnesses, displays, addresses, local usage), not the code.
 const MACHINE_DEPENDENT: [&str; 4] = ["backends", "screen", "urls", "usage"];
 
@@ -536,7 +536,7 @@ async fn catch_up(host: &Host) -> Vec<Value> {
 
 /// Older apps read what the host sends: a removed or retyped field breaks them. This fails
 /// until the field is kept, or `MIN_APP` is raised the two-release way and the snapshot
-/// re-recorded. New fields only need recording (`CODYNC_UPDATE_WIRE_SHAPE=1`).
+/// re-recorded. New fields only need recording (`SQUADBOTS_UPDATE_WIRE_SHAPE=1`).
 #[tokio::test]
 async fn wire_shape_matches_the_snapshot() {
     if Command::new(common::python()).arg("--version").output().is_err() {

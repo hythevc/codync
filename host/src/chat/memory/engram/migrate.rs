@@ -1,11 +1,11 @@
-//! One-way, retry-safe import of Codync's Markdown memory through Engram's native importer.
+//! One-way, retry-safe import of Squadbots's Markdown memory through Engram's native importer.
 
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fmt::Write as _, path::Path, time::Duration};
 
-const MARKER: &str = ".codync-markdown-imported";
+const MARKER: &str = ".squadbots-markdown-imported";
 const BACKUP: &str = "markdown-backup.json";
 
 pub(super) async fn run(binary: &Path, dir: &Path, project: &str) -> Result<()> {
@@ -109,7 +109,7 @@ fn bundle(project: &str, files: &BTreeMap<String, String>) -> Result<Value> {
             let timestamp = format!("{date} 00:00:00");
             let profile = path == "profile.md";
             let source = format!("{project}\n{path}\n{}\n{raw}", line + 1);
-            let mut id = String::from("obs-codync-");
+            let mut id = String::from("obs-squadbots-");
             for b in Sha256::digest(source.as_bytes()) {
                 let _ = write!(id, "{b:02x}");
             }
@@ -118,8 +118,8 @@ fn bundle(project: &str, files: &BTreeMap<String, String>) -> Result<Value> {
                 "type": if profile { "learning" } else { "discovery" },
                 "title": content.chars().take(100).collect::<String>(), "content": content,
                 "scope": if profile { "personal" } else { "project" },
-                "topic_key": format!("codync/import/{}/{}", path, line + 1),
-                "tool_name": format!("codync-import:{path}:{}", line + 1),
+                "topic_key": format!("squadbots/import/{}/{}", path, line + 1),
+                "tool_name": format!("squadbots-import:{path}:{}", line + 1),
                 "created_at": timestamp, "updated_at": timestamp, "revision_count": 1,
             }));
         }
@@ -128,7 +128,7 @@ fn bundle(project: &str, files: &BTreeMap<String, String>) -> Result<Value> {
     Ok(json!({
         "version": "0.2.0", "exported_at": chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         "sessions": [{"id": session, "project": project, "directory": "", "started_at": start,
-            "ended_at": start, "summary": "Imported Codync Markdown memory; original files preserved in markdown-backup.json"}],
+            "ended_at": start, "summary": "Imported Squadbots Markdown memory; original files preserved in markdown-backup.json"}],
         "observations": observations, "prompts": [],
     }))
 }
@@ -141,7 +141,7 @@ mod tests {
     fn preserves_dates_sources_and_repeatable_import_identity() {
         let files = BTreeMap::from([
             ("profile.md".into(), "# Profile\n- (2026-01-01) 喜歡繁體中文\n".into()),
-            ("log/2026-02.md".into(), "- (2026-02-02) 發布 Codync\n".into()),
+            ("log/2026-02.md".into(), "- (2026-02-02) 發布 Squadbots\n".into()),
         ]);
         let a = bundle("bot-a", &files).unwrap();
         let b = bundle("bot-a", &files).unwrap();
@@ -149,7 +149,7 @@ mod tests {
         let profile = &a["observations"][1];
         assert_eq!(profile["created_at"], "2026-01-01 00:00:00");
         assert_eq!(profile["content"], "喜歡繁體中文");
-        assert_eq!(profile["tool_name"], "codync-import:profile.md:2");
+        assert_eq!(profile["tool_name"], "squadbots-import:profile.md:2");
         assert_ne!(profile["sync_id"], bundle("bot-b", &files).unwrap()["observations"][1]["sync_id"]);
     }
 

@@ -1,7 +1,7 @@
 # Generate the Xcode project with: xcodegen generate --spec apps/project.yml
-name: Codync
+name: Squadbots
 options:
-  bundleIdPrefix: com.pokai
+  bundleIdPrefix: ai.squadbots
   deploymentTarget:
     iOS: "18.0"
     macOS: "14.0"
@@ -13,7 +13,7 @@ packages:
   Clerk:
     url: https://github.com/clerk/clerk-ios
     exactVersion: 1.5.6
-  CodyncKit:
+  SquadbotsKit:
     path: ios/Kit
   WebRTC:
     url: https://github.com/stasel/WebRTC
@@ -30,45 +30,45 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: 7FUM8A8H72
+    DEVELOPMENT_TEAM: TEAMID1234
     DEAD_CODE_STRIPPING: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
-    CODYNC_ENV: main
-    CODYNC_APP_NAME: Codync
-    CODYNC_IOS_BUNDLE_ID: com.pokai.Codync.ios
-    CODYNC_APP_GROUP: group.com.pokai.Codync
-    CODYNC_KEYCHAIN_GROUP: com.pokai.Codync
-    CODYNC_URL_SCHEME: codync
-    CODYNC_SCREEN_NAME: CodyncScreen
-    CODYNC_SCREEN_BUNDLE_ID: com.pokai.Codync.screen
-    CODYNC_DATA_FOLDER: .codync
+    SQUADBOTS_ENV: main
+    SQUADBOTS_APP_NAME: Squadbots
+    SQUADBOTS_IOS_BUNDLE_ID: ai.squadbots.Squadbots.ios
+    SQUADBOTS_APP_GROUP: group.ai.squadbots.Squadbots
+    SQUADBOTS_KEYCHAIN_GROUP: ai.squadbots.Squadbots
+    SQUADBOTS_URL_SCHEME: squadbots
+    SQUADBOTS_SCREEN_NAME: SquadbotsScreen
+    SQUADBOTS_SCREEN_BUNDLE_ID: ai.squadbots.Squadbots.screen
+    SQUADBOTS_DATA_FOLDER: .squadbots
   configs:
     Debug:
-      CODYNC_APNS_ENVIRONMENT: sandbox
+      SQUADBOTS_APNS_ENVIRONMENT: sandbox
     Release:
-      CODYNC_APNS_ENVIRONMENT: production
+      SQUADBOTS_APNS_ENVIRONMENT: production
     DevDebug:
-      CODYNC_ENV: dev
-      CODYNC_APP_NAME: Codync Dev
-      CODYNC_IOS_BUNDLE_ID: com.pokai.Codync.ios.dev
-      CODYNC_APP_GROUP: group.com.pokai.Codync.dev
-      CODYNC_KEYCHAIN_GROUP: com.pokai.Codync.dev
-      CODYNC_URL_SCHEME: codync-dev
-      CODYNC_SCREEN_NAME: CodyncDevScreen
-      CODYNC_SCREEN_BUNDLE_ID: com.pokai.Codync.dev.screen
-      CODYNC_DATA_FOLDER: .codync-dev
-      CODYNC_APNS_ENVIRONMENT: sandbox
+      SQUADBOTS_ENV: dev
+      SQUADBOTS_APP_NAME: Squadbots Dev
+      SQUADBOTS_IOS_BUNDLE_ID: ai.squadbots.Squadbots.ios.dev
+      SQUADBOTS_APP_GROUP: group.ai.squadbots.Squadbots.dev
+      SQUADBOTS_KEYCHAIN_GROUP: ai.squadbots.Squadbots.dev
+      SQUADBOTS_URL_SCHEME: squadbots-dev
+      SQUADBOTS_SCREEN_NAME: SquadbotsDevScreen
+      SQUADBOTS_SCREEN_BUNDLE_ID: ai.squadbots.Squadbots.dev.screen
+      SQUADBOTS_DATA_FOLDER: .squadbots-dev
+      SQUADBOTS_APNS_ENVIRONMENT: sandbox
     DevRelease:
-      CODYNC_ENV: dev
-      CODYNC_APP_NAME: Codync Dev
-      CODYNC_IOS_BUNDLE_ID: com.pokai.Codync.ios.dev
-      CODYNC_APP_GROUP: group.com.pokai.Codync.dev
-      CODYNC_KEYCHAIN_GROUP: com.pokai.Codync.dev
-      CODYNC_URL_SCHEME: codync-dev
-      CODYNC_SCREEN_NAME: CodyncDevScreen
-      CODYNC_SCREEN_BUNDLE_ID: com.pokai.Codync.dev.screen
-      CODYNC_DATA_FOLDER: .codync-dev
-      CODYNC_APNS_ENVIRONMENT: production
+      SQUADBOTS_ENV: dev
+      SQUADBOTS_APP_NAME: Squadbots Dev
+      SQUADBOTS_IOS_BUNDLE_ID: ai.squadbots.Squadbots.ios.dev
+      SQUADBOTS_APP_GROUP: group.ai.squadbots.Squadbots.dev
+      SQUADBOTS_KEYCHAIN_GROUP: ai.squadbots.Squadbots.dev
+      SQUADBOTS_URL_SCHEME: squadbots-dev
+      SQUADBOTS_SCREEN_NAME: SquadbotsDevScreen
+      SQUADBOTS_SCREEN_BUNDLE_ID: ai.squadbots.Squadbots.dev.screen
+      SQUADBOTS_DATA_FOLDER: .squadbots-dev
+      SQUADBOTS_APNS_ENVIRONMENT: production
 schemes:
   iOS:
     build:
@@ -117,11 +117,11 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: screen-macos/Info.plist
-        PRODUCT_NAME: $(CODYNC_SCREEN_NAME)
-        PRODUCT_BUNDLE_IDENTIFIER: $(CODYNC_SCREEN_BUNDLE_ID)
+        PRODUCT_NAME: $(SQUADBOTS_SCREEN_NAME)
+        PRODUCT_BUNDLE_IDENTIFIER: $(SQUADBOTS_SCREEN_BUNDLE_ID)
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
-        INFOPLIST_KEY_CFBundleDisplayName: $(CODYNC_APP_NAME) Screen
+        INFOPLIST_KEY_CFBundleDisplayName: $(SQUADBOTS_APP_NAME) Screen
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleIconName: AppIcon
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
@@ -152,30 +152,30 @@ targets:
     dependencies:
       - package: Clerk
         product: ClerkKit
-      - package: CodyncKit
-        product: CodyncKit
-      - package: CodyncKit
-        product: CodyncUI
+      - package: SquadbotsKit
+        product: SquadbotsKit
+      - package: SquadbotsKit
+        product: SquadbotsUI
       - target: Widgets
         embed: true
       - target: NotificationService
         embed: true
     postBuildScripts:
-      - name: Codync environment
+      - name: Squadbots environment
         basedOnDependencyAnalysis: false
         showEnvVars: false
         script: |
           # The scheme chooses an environment independently of Debug/Release optimization.
-          cp "$SRCROOT/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
+          cp "$SRCROOT/shared/Config/$SQUADBOTS_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
     settings:
       base:
-        PRODUCT_NAME: $(CODYNC_APP_NAME)
-        PRODUCT_BUNDLE_IDENTIFIER: $(CODYNC_IOS_BUNDLE_ID)
+        PRODUCT_NAME: $(SQUADBOTS_APP_NAME)
+        PRODUCT_BUNDLE_IDENTIFIER: $(SQUADBOTS_IOS_BUNDLE_ID)
         INFOPLIST_FILE: ios/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: ios/Resources/iOS.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
-        INFOPLIST_KEY_CFBundleDisplayName: $(CODYNC_APP_NAME)
+        INFOPLIST_KEY_CFBundleDisplayName: $(SQUADBOTS_APP_NAME)
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -184,7 +184,7 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: Scan the pairing code shown on your computer.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Talk to your bots in a voice call.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Your words are transcribed on this iPhone and sent to your bot as a message.
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Codync connects to the computer running your bots on your local network.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Squadbots connects to the computer running your bots on your local network.
         # Portrait everywhere except the screen viewer (AppDelegate + OrientationLock).
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
@@ -197,18 +197,18 @@ targets:
     sources:
       - ios/Widgets
     dependencies:
-      - package: CodyncKit
-        product: CodyncKit
+      - package: SquadbotsKit
+        product: SquadbotsKit
       - sdk: WidgetKit.framework
       - sdk: SwiftUI.framework
     settings:
       base:
-        PRODUCT_NAME: CodyncWidgets
-        PRODUCT_BUNDLE_IDENTIFIER: $(CODYNC_IOS_BUNDLE_ID).LiveActivity
+        PRODUCT_NAME: SquadbotsWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(SQUADBOTS_IOS_BUNDLE_ID).LiveActivity
         INFOPLIST_FILE: ios/Widgets/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: ios/Widgets/Resources/Widgets.entitlements
-        INFOPLIST_KEY_CFBundleDisplayName: $(CODYNC_APP_NAME)
+        INFOPLIST_KEY_CFBundleDisplayName: $(SQUADBOTS_APP_NAME)
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES
   # Opens end-to-end sealed alert text (spec §6.7) with this account's push key from the shared Keychain.
@@ -218,15 +218,15 @@ targets:
     sources:
       - ios/NotificationService
     dependencies:
-      - package: CodyncKit
-        product: CodyncKit
+      - package: SquadbotsKit
+        product: SquadbotsKit
     settings:
       base:
-        PRODUCT_NAME: CodyncNotificationService
-        PRODUCT_BUNDLE_IDENTIFIER: $(CODYNC_IOS_BUNDLE_ID).NotificationService
+        PRODUCT_NAME: SquadbotsNotificationService
+        PRODUCT_BUNDLE_IDENTIFIER: $(SQUADBOTS_IOS_BUNDLE_ID).NotificationService
         INFOPLIST_FILE: ios/NotificationService/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: ios/NotificationService/NotificationService.entitlements
-        INFOPLIST_KEY_CFBundleDisplayName: $(CODYNC_APP_NAME)
+        INFOPLIST_KEY_CFBundleDisplayName: $(SQUADBOTS_APP_NAME)
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES

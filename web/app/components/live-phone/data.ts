@@ -1,4 +1,4 @@
-// Colors from CodyncKit/Design/Theme.swift (light appearance) and the demo story the
+// Colors from SquadbotsKit/Design/Theme.swift (light appearance) and the demo story the
 // App Store screenshots tell: a `pace` running app, an ISO week bug in src/pace.js.
 
 export const palette = {

@@ -5,7 +5,7 @@ import { account } from './account'
 import type { AppModel } from './app-model'
 import type { BotStore } from './bot-store'
 
-// Wire types of the Codync cloud (`/v1`, cloud/src/api.ts); times are epoch milliseconds.
+// Wire types of the Squadbots cloud (`/v1`, cloud/src/api.ts); times are epoch milliseconds.
 
 /** A computer in the account (`GET /v1/computers`). */
 export interface CloudComputer {
@@ -52,7 +52,7 @@ export class CloudError extends Error {
       code === 'requestExpired' ? 'The request expired. Ask again.'
       : code === 'accountDeleted' ? 'This account was deleted.'
       : code === 'rateLimited' ? 'Too many requests. Try again in a little while.'
-      : (message ?? `Codync cloud error (${code})`),
+      : (message ?? `Squadbots cloud error (${code})`),
     )
   }
 
@@ -63,7 +63,7 @@ export class CloudError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, signed = false): Promise<T> {
-  const res = await window.codync.cloud.request(method, path, body, signed)
+  const res = await window.squadbots.cloud.request(method, path, body, signed)
   if (!res.ok) throw new CloudError(res.error.status, res.error.code, res.error.message)
   return res.value as T
 }
@@ -116,7 +116,7 @@ export class CloudModel extends Observable {
       // Signed in: make this computer known to the account, then list its computers.
       void (async () => {
         try {
-          await request('POST', 'v1/devices', { name: await deviceName(), platform: { darwin: 'macos', linux: 'linux', win32: 'windows' }[window.codync.platform] }, true)
+          await request('POST', 'v1/devices', { name: await deviceName(), platform: { darwin: 'macos', linux: 'linux', win32: 'windows' }[window.squadbots.platform] }, true)
         } catch (error) {
           this.fail(error)
         }
@@ -288,5 +288,5 @@ export class CloudModel extends Observable {
 
 /** This computer's name for the account's device list. */
 async function deviceName() {
-  return window.codync.computerName || { darwin: 'Mac', linux: 'Linux', win32: 'Windows' }[window.codync.platform]
+  return window.squadbots.computerName || { darwin: 'Mac', linux: 'Linux', win32: 'Windows' }[window.squadbots.platform]
 }

@@ -40,5 +40,5 @@ destination.write_bytes(binary)
 destination.chmod(0o755)
 if "GITHUB_ENV" in os.environ:
     with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-        env.write(f"CODYNC_TEST_ENGRAM={destination}\n")
+        env.write(f"SQUADBOTS_TEST_ENGRAM={destination}\n")
 print(destination)

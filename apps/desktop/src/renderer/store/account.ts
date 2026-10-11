@@ -9,7 +9,7 @@ export interface AccountInfo {
 }
 
 /**
- * The Codync account (Clerk, through the main process). An account never grants access to a
+ * The Squadbots account (Clerk, through the main process). An account never grants access to a
  * computer by itself: each one still approves this device (spec §4.2).
  */
 export class AccountSession extends Observable {
@@ -25,12 +25,12 @@ export class AccountSession extends Observable {
   }
 
   async start() {
-    const state = await window.codync.account.state()
+    const state = await window.squadbots.account.state()
     this.apply(state)
-    window.codync.account.onChange((s) => this.apply(s))
+    window.squadbots.account.onChange((s) => this.apply(s))
   }
 
-  private apply(s: Awaited<ReturnType<typeof window.codync.account.state>>) {
+  private apply(s: Awaited<ReturnType<typeof window.squadbots.account.state>>) {
     this.isReady = s.ready
     this.isConfigured = s.configured
     this.isBusy = s.busy
@@ -41,15 +41,15 @@ export class AccountSession extends Observable {
   }
 
   async signIn(provider: SignInProvider) {
-    await window.codync.account.signIn(provider)
+    await window.squadbots.account.signIn(provider)
   }
 
   async signOut() {
-    await window.codync.account.signOut()
+    await window.squadbots.account.signOut()
   }
 
   sessionToken() {
-    return window.codync.account.token()
+    return window.squadbots.account.token()
   }
 }
 

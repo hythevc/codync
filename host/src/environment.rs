@@ -8,7 +8,7 @@ pub enum Environment {
 
 impl Environment {
     pub const fn current() -> Self {
-        match option_env!("CODYNC_ENV") {
+        match option_env!("SQUADBOTS_ENV") {
             Some(value) => match value.as_bytes() {
                 b"main" => Self::Main,
                 _ => Self::Dev,
@@ -33,61 +33,61 @@ impl Environment {
 
     pub const fn data_folder(self) -> &'static str {
         match self {
-            Self::Main => ".codync",
-            Self::Dev => ".codync-dev",
+            Self::Main => ".squadbots",
+            Self::Dev => ".squadbots-dev",
         }
     }
 
     #[cfg(any(unix, test))]
     pub const fn service_label(self) -> &'static str {
         match self {
-            Self::Main => "com.pokai.codync.host",
-            Self::Dev => "com.pokai.codync.dev.host",
+            Self::Main => "ai.squadbots.squadbots.host",
+            Self::Dev => "ai.squadbots.squadbots.ai.host",
         }
     }
 
     #[cfg(any(unix, test))]
     pub const fn systemd_unit(self) -> &'static str {
         match self {
-            Self::Main => "codync-host.service",
-            Self::Dev => "codync-dev-host.service",
+            Self::Main => "squadbots-host.service",
+            Self::Dev => "squadbots-dev-host.service",
         }
     }
 
     #[cfg(any(windows, test))]
     pub const fn windows_value(self) -> &'static str {
         match self {
-            Self::Main => "CodyncHost",
-            Self::Dev => "CodyncDevHost",
+            Self::Main => "SquadbotsHost",
+            Self::Dev => "SquadbotsDevHost",
         }
     }
 
     #[cfg(any(windows, test))]
     pub const fn supervisor(self) -> &'static str {
         match self {
-            Self::Main => "codync-hostw.exe",
-            Self::Dev => "codync-dev-hostw.exe",
+            Self::Main => "squadbots-hostw.exe",
+            Self::Dev => "squadbots-dev-hostw.exe",
         }
     }
 
     pub const fn cloud_url(self) -> &'static str {
         match self {
-            Self::Main => "https://api.codync.dev",
-            Self::Dev => "https://dev-api.codync.dev",
+            Self::Main => "https://api.squadbots.ai",
+            Self::Dev => "https://dev-api.squadbots.ai",
         }
     }
 
     pub const fn url_scheme(self) -> &'static str {
         match self {
-            Self::Main => "codync",
-            Self::Dev => "codync-dev",
+            Self::Main => "squadbots",
+            Self::Dev => "squadbots-dev",
         }
     }
 
     pub fn require_release_updates(self) -> anyhow::Result<()> {
         anyhow::ensure!(
             self == Self::Main,
-            "Codync Dev does not install production updates; rebuild the development app"
+            "Squadbots Dev does not install production updates; rebuild the development app"
         );
         Ok(())
     }
@@ -100,11 +100,11 @@ mod tests {
     #[test]
     fn development_cannot_replace_production_resources() {
         assert_eq!(Main.port(), 19222);
-        assert_eq!(Main.data_folder(), ".codync");
-        assert_eq!(Main.service_label(), "com.pokai.codync.host");
-        assert_eq!(Main.systemd_unit(), "codync-host.service");
-        assert_eq!(Main.windows_value(), "CodyncHost");
-        assert_eq!(Main.supervisor(), "codync-hostw.exe");
+        assert_eq!(Main.data_folder(), ".squadbots");
+        assert_eq!(Main.service_label(), "ai.squadbots.squadbots.host");
+        assert_eq!(Main.systemd_unit(), "squadbots-host.service");
+        assert_eq!(Main.windows_value(), "SquadbotsHost");
+        assert_eq!(Main.supervisor(), "squadbots-hostw.exe");
         assert_ne!(Main.port(), Dev.port());
         for (main, dev) in [
             (Main.data_folder(), Dev.data_folder()),

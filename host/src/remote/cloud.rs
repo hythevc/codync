@@ -1,4 +1,4 @@
-//! The Codync cloud (Cloudflare relay + accounts, spec §4.2, §4.3, §8.4, §9.6): which one
+//! The Squadbots cloud (Cloudflare relay + accounts, spec §4.2, §4.3, §8.4, §9.6): which one
 //! this host uses, its `/v1/host/*` API (signed with `Codync-Sig`), the state pull that may
 //! only renew or remove account devices, never add one, and account access requests with
 //! the commit-then-reveal SAS. The relay socket itself lives in `relay`.
@@ -16,7 +16,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::watch;
 
-/// The cloud this build belongs to: main only for builds made with `CODYNC_ENV=main` (the
+/// The cloud this build belongs to: main only for builds made with `SQUADBOTS_ENV=main` (the
 /// release workflows), dev for every local build, debug or release, like the apps built next
 /// to it.
 fn build_cloud_url() -> &'static str {
@@ -43,11 +43,11 @@ const SAS_NONCES_PER_HOUR: usize = 5;
 const HOUR_MS: i64 = 60 * 60 * 1000;
 
 /// The cloud base URL in use, or `None` when the cloud is off.
-/// `CODYNC_CLOUD=off` > turned off here > `CODYNC_CLOUD_URL` (a cloud you're developing) > the
+/// `SQUADBOTS_CLOUD=off` > turned off here > `SQUADBOTS_CLOUD_URL` (a cloud you're developing) > the
 /// build's cloud. Which cloud is never saved here: on/off is the only stored cloud setting.
 /// Unit tests point at a fake cloud through kv `test_cloud_url`, so they never reach a real one.
 pub fn url(store: &Store) -> Option<String> {
-    if std::env::var("CODYNC_CLOUD").is_ok_and(|v| v == "off")
+    if std::env::var("SQUADBOTS_CLOUD").is_ok_and(|v| v == "off")
         || store.kv_get("cloud_enabled").as_deref() == Some("false")
     {
         return None;
@@ -55,7 +55,7 @@ pub fn url(store: &Store) -> Option<String> {
     if cfg!(test) {
         return store.kv_get("test_cloud_url");
     }
-    let custom = std::env::var("CODYNC_CLOUD_URL")
+    let custom = std::env::var("SQUADBOTS_CLOUD_URL")
         .ok()
         .map(|u| u.trim().trim_end_matches('/').to_owned())
         .filter(|u| valid_url(&format!("{u}/")));
@@ -191,7 +191,7 @@ pub struct CloudError {
 
 impl std::fmt::Display for CloudError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "the Codync cloud refused ({} {}): {}", self.status, self.code, self.message)
+        write!(f, "the Squadbots cloud refused ({} {}): {}", self.status, self.code, self.message)
     }
 }
 
@@ -225,7 +225,7 @@ pub fn authority(base: &str) -> Result<String> {
 }
 
 fn base(hub: &Hub) -> Result<String> {
-    url(&hub.store).ok_or_else(|| anyhow!("The Codync cloud is off on this computer."))
+    url(&hub.store).ok_or_else(|| anyhow!("The Squadbots cloud is off on this computer."))
 }
 
 /// One signed `/v1/host/*` call.
@@ -236,7 +236,7 @@ async fn call(hub: &Hub, base: &str, method: Method, path: &str, body: Option<&V
     if body.is_some() {
         req = req.header("content-type", "application/json").body(bytes);
     }
-    let res = req.send().await.context("the Codync cloud is unreachable")?;
+    let res = req.send().await.context("the Squadbots cloud is unreachable")?;
     let status = res.status();
     let v: Value = res.json().await.unwrap_or(Value::Null);
     if !status.is_success() {
@@ -264,7 +264,7 @@ pub async fn register(hub: &Hub, base: &str) -> Result<()> {
     if v["computerId"].as_str() != Some(hub.identity.computer_id().as_str()) {
         bail!("the cloud registered a different computer id");
     }
-    tracing::info!(computer_id = hub.identity.computer_id(), "registered with the Codync cloud");
+    tracing::info!(computer_id = hub.identity.computer_id(), "registered with the Squadbots cloud");
     update_status(hub, |s| s.registered = true);
     Ok(())
 }
@@ -632,7 +632,7 @@ mod tests {
     use crate::remote::identity::Identity;
 
     fn temp_hub() -> Arc<Hub> {
-        let dir = std::env::temp_dir().join(format!("codync-cloud-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("squadbots-cloud-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("t.db")).unwrap();
         Hub::new(store, "host".into(), Identity::load_or_create(&dir).unwrap(), "token".into(), 0)
@@ -672,12 +672,12 @@ mod tests {
 
     #[test]
     fn only_safe_cloud_urls() {
-        assert!(valid_url("https://codync-cloud.example.workers.dev/"));
+        assert!(valid_url("https://squadbots-cloud.example.workers.dev/"));
         assert!(valid_url("http://127.0.0.1:8787/"));
         assert!(!valid_url("http://example.com/"));
         assert!(!valid_url("https://example.com/path/"));
         assert!(!valid_url("ftp://example.com/"));
-        assert_eq!(authority("https://Codync.Example.dev").unwrap(), "codync.example.dev");
+        assert_eq!(authority("https://Squadbots.Example.dev").unwrap(), "squadbots.example.dev");
         assert_eq!(authority("http://127.0.0.1:8787").unwrap(), "127.0.0.1:8787");
         assert_eq!(authority("https://x.dev:443").unwrap(), "x.dev", "default port is left out");
     }

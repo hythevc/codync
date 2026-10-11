@@ -1,13 +1,13 @@
 [package]
-name = "codync-host"
+name = "squadbots-host"
 version = "2.13.0"
 edition = "2024"
 # let-chains (`if let … && let …`) need 1.88.
 rust-version = "1.88"
-default-run = "codync-host"
-description = "Runs your coding-agent bots and serves the Codync apps"
+default-run = "squadbots-host"
+description = "Runs your coding-agent bots and serves the Squadbots apps"
 license = "Apache-2.0"
-repository = "https://github.com/leepokai/Codync"
+repository = "https://github.com/jaimedhenriques/squadbots"
 
 [dependencies]
 anyhow = "1.0.104"

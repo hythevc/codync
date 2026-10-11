@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import SquadbotsKit
+import SquadbotsUI
 import SwiftUI
 
 /// Cold launch: the app-icon bot pops out of the system launch screen and looks around while the

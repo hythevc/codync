@@ -25,14 +25,14 @@ impl Drop for Host {
 
 impl Host {
     async fn start() -> Self {
-        let home = std::env::temp_dir().join(format!("codync-files-e2e-{}", uuid::Uuid::new_v4()));
+        let home = std::env::temp_dir().join(format!("squadbots-files-e2e-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
         common::seed_memory_runtime(&home);
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-        let child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+        let child = Command::new(env!("CARGO_BIN_EXE_squadbots-host"))
             .args(["serve", "--bind", "127.0.0.1", "--port", &port.to_string()])
-            .env("CODYNC_CLOUD", "off")
-            .env("CODYNC_HOME", &home)
+            .env("SQUADBOTS_CLOUD", "off")
+            .env("SQUADBOTS_HOME", &home)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -56,10 +56,10 @@ impl Host {
     async fn restart(&mut self) {
         common::stop(&mut self.child);
         let port = self.base.rsplit(':').next().unwrap();
-        self.child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+        self.child = Command::new(env!("CARGO_BIN_EXE_squadbots-host"))
             .args(["serve", "--bind", "127.0.0.1", "--port", port])
-            .env("CODYNC_CLOUD", "off")
-            .env("CODYNC_HOME", &self.home)
+            .env("SQUADBOTS_CLOUD", "off")
+            .env("SQUADBOTS_HOME", &self.home)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()

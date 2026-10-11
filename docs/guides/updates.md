@@ -13,14 +13,14 @@ action on its Updates page. Only packaged `main` builds update: `npm run dev` an
 with `tools/account-config.mjs dev` never replace themselves with a release.
 
 The app checks daily (hourly while a release waits for the iPhone app, below).
-Automatic installation waits until no Codync window is focused, there has been no
+Automatic installation waits until no Squadbots window is focused, there has been no
 keyboard/mouse input for ten minutes, and the local host reports that it is idle.
 A staged update also installs when quitting. Manual installation can interrupt work.
 A release whose `latest-mac.yml` names a `minApp` newer than the App Store's iPhone
 app waits while an iPhone is paired with this host.
 
-Before replacement on macOS, Codync unregisters its screen helper and stops the host
-(`codync-host stop`), which runs from inside the app; on Linux the installed host keeps
+Before replacement on macOS, Squadbots unregisters its screen helper and stops the host
+(`squadbots-host stop`), which runs from inside the app; on Linux the installed host keeps
 running. If stopping fails, installation pauses with a retry action, and an install that
 fails afterwards starts the host again. A
 persistent restart marker makes the next app launch reinstall the host service from
@@ -31,7 +31,7 @@ The desktop window's close-to-background handler also listens to Electron's nati
 `before-quit-for-update` event. On macOS, `quitAndInstall()` closes windows before
 `app.before-quit`, so waiting for the latter blocks installation after the host has
 already stopped. If an older release is stuck on **Update to …** after downloading,
-choose **Codync → Quit Codync**: the staged installer can finish and relaunch the app.
+choose **Squadbots → Quit Squadbots**: the staged installer can finish and relaunch the app.
 This lifecycle fix is desktop-only; iOS uses the App Store, and the terminal client
 uses the independent host updater without Electron windows.
 
@@ -42,50 +42,50 @@ the host and leaves the staged release available to retry.
 
 ### Recovering from a failed update
 
-If **Update to …** appears to do nothing, first quit Codync completely (on macOS,
-**Codync → Quit Codync**, not just the window's close button). A downloaded update
-may finish installing when the old app exits. Reopen Codync if it does not relaunch,
+If **Update to …** appears to do nothing, first quit Squadbots completely (on macOS,
+**Squadbots → Quit Squadbots**, not just the window's close button). A downloaded update
+may finish installing when the old app exits. Reopen Squadbots if it does not relaunch,
 then check the version in **Settings → Updates**.
 
 If it still fails, uninstall and reinstall the application from the
-[latest release](https://github.com/leepokai/Codync/releases/latest).
+[latest release](https://github.com/jaimedhenriques/squadbots/releases/latest).
 Replace the application while keeping its data and settings. **Do not use Reset
-all data, delete `~/.codync` (or a custom `CODYNC_HOME`), remove Codync's application
+all data, delete `~/.squadbots` (or a custom `SQUADBOTS_HOME`), remove Squadbots's application
 support/settings folders, or use a cleanup utility.** Those are data resets, not
 update repairs; deleting the host's keys also changes its identity and requires
 devices to pair again.
 
 For a Mac installed from the DMG or one-line installer:
 
-1. Quit Codync. Before moving the old app, remove its background host service:
+1. Quit Squadbots. Before moving the old app, remove its background host service:
 
    ```sh
-   /Applications/Codync.app/Contents/Resources/codync-host uninstall
+   /Applications/Squadbots.app/Contents/Resources/squadbots-host uninstall
    ```
 
    This removes the service and restores the wrapped Claude Code status line;
    it does not delete the host's database or keys. If the app is installed
    elsewhere, use that app's path.
-2. Move only `/Applications/Codync.app` to the Trash. Download `codync-macos.dmg`
-   from the latest release and drag the new Codync app into Applications.
+2. Move only `/Applications/Squadbots.app` to the Trash. Download `squadbots-macos.dmg`
+   from the latest release and drag the new Squadbots app into Applications.
 3. Open the new app. It reinstalls the host service. If the host remains stopped,
    run the new bundled host explicitly:
 
    ```sh
-   /Applications/Codync.app/Contents/Resources/codync-host install
-   /Applications/Codync.app/Contents/Resources/codync-host status
+   /Applications/Squadbots.app/Contents/Resources/squadbots-host install
+   /Applications/Squadbots.app/Contents/Resources/squadbots-host status
    ```
 
-For a Homebrew app installation, quit Codync and use
-`brew reinstall --cask leepokai/codync/codync`, then open Codync. The cask removes
+For a Homebrew app installation, quit Squadbots and use
+`brew reinstall --cask jaimedhenriques/squadbots/squadbots`, then open Squadbots. The cask removes
 the old service before replacement. Do **not** add `--zap`, which removes data.
 
-On Windows, quit Codync and stop its bundled `codync-host.exe` with the `stop`
+On Windows, quit Squadbots and stop its bundled `squadbots-host.exe` with the `stop`
 command before reinstalling the desktop app. On Linux, replace the AppImage or
 reinstall the desktop package using the original installation method. For a
-standalone host, run `codync-host stop`, reinstall using the original installer
-or `brew reinstall leepokai/codync/codync-host`, then run `codync-host install`.
-`codync-host uninstall` removes the background service, not the executable or
+standalone host, run `squadbots-host stop`, reinstall using the original installer
+or `brew reinstall jaimedhenriques/squadbots/squadbots-host`, then run `squadbots-host install`.
+`squadbots-host uninstall` removes the background service, not the executable or
 saved bots, so it is not a complete application uninstall.
 
 After reinstalling, confirm the app version and that the computer reconnects.
@@ -133,11 +133,11 @@ need a manual download of the desktop app. Remove together:
 ## Standalone hosts on Linux and macOS
 
 ```sh
-codync-host update --check
-codync-host update
-codync-host update --status --json
-codync-host update --auto on
-codync-host update --auto off
+squadbots-host update --check
+squadbots-host update
+squadbots-host update --status --json
+squadbots-host update --auto on
+squadbots-host update --auto off
 ```
 
 Use `--port` for a host on a nondefault port. `--force` explicitly allows a manual
@@ -164,7 +164,7 @@ previous binary. Data is preserved; this is binary rollback, not database rollba
 or recovery from power loss during installation.
 
 The host bundled in the Mac desktop app is updated with the app. Homebrew hosts use
-`brew upgrade leepokai/codync/codync-host`, followed by `codync-host install`.
+`brew upgrade jaimedhenriques/squadbots/squadbots-host`, followed by `squadbots-host install`.
 Development builds must be rebuilt. The independent updater refuses to overwrite
 those installations. The Linux desktop app uses the installed host, which updates
 with the commands above, independently of the app.
@@ -189,7 +189,7 @@ already distributed clients. Repository Actions secrets:
 The desktop workflow signs and notarizes the Mac app, builds its DMG and zip, adds
 `minApp` to `latest-mac.yml` and generates `appcast.xml` for the zip; it builds the
 Linux AppImage, deb and tar.gz on x86_64 and arm64. The host
-workflow emits `codync-host-<platform>.update.json` and `.update.json.sig` alongside
+workflow emits `squadbots-host-<platform>.update.json` and `.update.json.sig` alongside
 each archive. Signing fails if a private key does not match the committed public
 key. Never commit private keys or put them in command-line arguments.
 
@@ -204,4 +204,4 @@ used. Building locally or configuring secrets does not publish a release.
 - [Grok Bot's safe relaunch gate](https://github.com/b-nnett/grok-bot-0.18-reconstructed/blob/main/source/electron-main/update/safe-relaunch-gate.ts)
 
 Grok Bot supplied the reference for opt-in, staged updates and idle-gated restart.
-Codync uses window focus and input idle time; it does not require a locked screen.
+Squadbots uses window focus and input idle time; it does not require a locked screen.

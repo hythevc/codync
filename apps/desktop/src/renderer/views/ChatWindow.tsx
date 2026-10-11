@@ -36,7 +36,7 @@ import { useSSH, useSSHAttachments } from './settings/ssh-model'
 import './chat-window.css'
 import './sidebar-header.css'
 
-const isMac = window.codync.platform === 'darwin'
+const isMac = window.squadbots.platform === 'darwin'
 
 /** Native desktop chat: roster on the left, the conversation on the right (Grok Bot's desktop layout). */
 export function ChatWindow() {
@@ -52,7 +52,7 @@ export function ChatWindow() {
 
   useEffect(
     () =>
-      window.codync.app.onCommand((c: WindowCommand) => {
+      window.squadbots.app.onCommand((c: WindowCommand) => {
         switch (c.kind) {
           case 'computerAccess':
             return setShowAccess(true)
@@ -106,8 +106,8 @@ export function ChatWindow() {
       <Dialog
         open={confirmReset}
         title="Reset all data?"
-        message="Signs out every account and deletes this computer's bots, conversations, keys and settings. Codync then starts over from the welcome screen."
-        actions={[{ title: 'Reset everything', destructive: true, action: () => void window.codync.app.resetAllData() }]}
+        message="Signs out every account and deletes this computer's bots, conversations, keys and settings. Squadbots then starts over from the welcome screen."
+        actions={[{ title: 'Reset everything', destructive: true, action: () => void window.squadbots.app.resetAllData() }]}
         onClose={() => setConfirmReset(false)}
       />
       {/* Approving a device: the code the device shows must match (spec §4.2 B). Closing puts it off. */}
@@ -192,7 +192,7 @@ function ChatSplitView() {
 
   useEffect(
     () =>
-      window.codync.app.onCommand((c) => {
+      window.squadbots.app.onCommand((c) => {
         if (c.kind === 'newChat' && onlineStores.length) compose()
         if (c.kind === 'search') setSearching(true)
         if (c.kind === 'toggleSidebar') setCompact(!prefs.sidebarCompact.get())
@@ -202,7 +202,7 @@ function ChatSplitView() {
   // Screenshot/UI checks (development builds): open a screen at launch.
   const debugOpened = useRef(false)
   useEffect(() => {
-    const target = window.codync.debugOpen
+    const target = window.squadbots.debugOpen
     if (!target || debugOpened.current) return
     if (target === 'compose' || target === 'group') {
       if (!onlineStores.length) return
@@ -234,7 +234,7 @@ function ChatSplitView() {
     { title: bot.pinned ? 'Unpin' : 'Pin', icon: 'pin', action: () => store.setPinned(bot, !bot.pinned) },
     { title: 'Mark as Read', icon: 'bell.badge', action: () => store.markAllRead(bot.id) },
     { title: 'Edit Profile…', icon: 'square.and.pencil', divider: true, action: () => setEditing({ id: crypto.randomUUID(), draft: draftOf(bot), store }) },
-    { title: 'Copy conversation ID', icon: 'square.on.square', divider: true, action: () => window.codync.app.copy(bot.id) },
+    { title: 'Copy conversation ID', icon: 'square.on.square', divider: true, action: () => window.squadbots.app.copy(bot.id) },
     { title: 'New session', icon: 'arrow.counterclockwise', action: () => setNewSessionBot({ bot, store }) },
     { title: 'Hide from sidebar', icon: 'eye.slash', divider: true, action: () => store.setHidden(bot, true) },
     { title: 'Delete', icon: 'trash', destructive: true, action: () => setConfirmDelete({ bot, store }) },

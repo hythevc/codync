@@ -43,10 +43,10 @@ pub(super) fn pair(buf: &mut Buffer, area: Rect, url: Option<&str>) {
         inner.x,
         y,
         inner.width,
-        if url.starts_with("codync-dev:") {
-            "Scan with Codync Dev on your iPhone:"
+        if url.starts_with("squadbots-dev:") {
+            "Scan with Squadbots Dev on your iPhone:"
         } else {
-            "Scan with the Codync iPhone app, or open on the phone:"
+            "Scan with the Squadbots iPhone app, or open on the phone:"
         },
         t.secondary.patch(t.panel),
     );

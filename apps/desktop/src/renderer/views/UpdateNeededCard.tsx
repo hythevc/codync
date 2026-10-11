@@ -7,18 +7,18 @@ import { useApp, useStore } from '../store/context'
 /** The words every client uses for a version mismatch (iOS, the TUI and this app). */
 export const updateNeededText = {
   title(m: VersionMismatch, host: string) {
-    return m.kind === 'updateApp' ? 'Update this app' : `Update Codync on ${host}`
+    return m.kind === 'updateApp' ? 'Update this app' : `Update Squadbots on ${host}`
   },
   detail(m: VersionMismatch, host: string, hostVersion: string | null | undefined, os: string | null | undefined, instructions = true) {
     if (m.kind === 'updateApp') {
-      const runs = hostVersion ? `${host} runs Codync ${hostVersion} and` : host
+      const runs = hostVersion ? `${host} runs Squadbots ${hostVersion} and` : host
       return `${runs} needs this app to be ${m.minimum} or newer. Your chats are safe on the computer.`
     }
     const how =
-      os === 'macos' ? 'Open Codync on that Mac and choose Check for Updates.'
-      : os === 'linux' ? 'Run codync-host update there.'
-      : 'Update Codync on that computer.'
-    const needs = `${host} runs Codync ${m.version}; this app needs ${m.minimum} or newer.`
+      os === 'macos' ? 'Open Squadbots on that Mac and choose Check for Updates.'
+      : os === 'linux' ? 'Run squadbots-host update there.'
+      : 'Update Squadbots on that computer.'
+    const needs = `${host} runs Squadbots ${m.version}; this app needs ${m.minimum} or newer.`
     return instructions ? `${needs} ${how}` : needs
   },
 }
@@ -36,9 +36,9 @@ export function UpdateNeededCard() {
   // app's bundled copy. Linux has no bundled host, so the card says how to update it instead.
   const action: [string, () => void] | null =
     mismatch.kind === 'updateApp'
-      ? ['Update Codync', () => window.codync.updates.check()]
-      : store === app.local && !app.host.dev && window.codync.platform !== 'linux'
-        ? [`Update ${store.hostName}`, () => window.codync.host.restart()]
+      ? ['Update Squadbots', () => window.squadbots.updates.check()]
+      : store === app.local && !app.host.dev && window.squadbots.platform !== 'linux'
+        ? [`Update ${store.hostName}`, () => window.squadbots.host.restart()]
         : null
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 14, background: 'var(--surface)', borderRadius: 16 }}>

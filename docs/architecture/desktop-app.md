@@ -1,6 +1,6 @@
 # Desktop app (macOS, Linux and Windows)
 
-Codync's computer-side app is one Electron app in `apps/desktop/` for macOS, Linux and Windows. It
+Squadbots's computer-side app is one Electron app in `apps/desktop/` for macOS, Linux and Windows. It
 replaced the SwiftUI Mac app (`apps/macos/`) and the GTK 4 Linux app (`apps/linux/`) in 2.7.0.
 The iPhone app stays native SwiftUI; its package moved from `kit/` into `apps/ios/Kit/`.
 
@@ -24,12 +24,12 @@ determines when there are no earlier messages.
 
 | Path | |
 |---|---|
-| `src/main/` | Main process: host service (`host-controller.ts`), loopback HTTP/SSE proxy (`host-proxy.ts`), menu bar/tray, windows, account sign-in (Clerk Frontend API, `account.ts`), cloud API and device key (`cloud.ts`), updates (`updates.ts`), SSH tunnels (`ssh.ts`), Codync Screen agent (`screen.ts`), on-device speech (`speech.ts`), browser sign-in callbacks (`auth.ts`) |
-| `src/preload/` | The `window.codync` bridge (types in `src/shared/ipc.ts`) |
+| `src/main/` | Main process: host service (`host-controller.ts`), loopback HTTP/SSE proxy (`host-proxy.ts`), menu bar/tray, windows, account sign-in (Clerk Frontend API, `account.ts`), cloud API and device key (`cloud.ts`), updates (`updates.ts`), SSH tunnels (`ssh.ts`), Squadbots Screen agent (`screen.ts`), on-device speech (`speech.ts`), browser sign-in callbacks (`auth.ts`) |
+| `src/preload/` | The `window.squadbots` bridge (types in `src/shared/ipc.ts`) |
 | `src/renderer/store/` | `BotStore` (port of kit's; `bot-store.ts` actions over `bot-sync.ts` events stream and `bot-mirror.ts` state), `AppModel` (window state, approvals), `CloudModel` (claims, cloud default), `AccountSession` |
 | `src/renderer/components/` | Design system: controls, overlays (sheets, dialogs, menus), SF Symbol icons, character avatars, thinking orbs |
 | `src/renderer/views/` | Screens, mirroring kit's folders (`thread/`, `bots/`, `marketplace/`, `settings/`, `routines/`, `call/`) |
-| `native/speech-macos/` | `codync-speech`, a Swift helper running SFSpeechRecognizer for on-device calls |
+| `native/speech-macos/` | `squadbots-speech`, a Swift helper running SFSpeechRecognizer for on-device calls |
 | `tools/export-symbols.swift` | Renders the SF Symbols the app uses into masks at build time (macOS) |
 
 The renderer owns all state; closing the window hides it, so the menu bar keeps its data.
@@ -68,11 +68,11 @@ The TUI connects to one host at a time, so it keeps its single roster.
 - **Icons**: SF Symbols may only ship in apps for Apple platforms, so the masks are generated
   on macOS at build time and never committed; Linux draws the closest Lucide icons.
 - **On-device speech** is macOS only; Linux calls use OpenAI or Gemini on the user's key.
-- **Host**: the Mac app bundles `codync-host` in `Contents/Resources`; Linux uses the installed
+- **Host**: the Mac app bundles `squadbots-host` in `Contents/Resources`; Linux uses the installed
   host (an AppImage's mount path changes on every launch, so a service can't point into it).
 - **Windows** (x64, per-user NSIS install, unsigned for now so SmartScreen warns once) bundles
-  `codync-host.exe` and `codync-hostw.exe` in `resources/`. `codync-host install` writes the
-  per-user Run key (`HKCU\…\Run\CodyncHost`), which starts `codync-hostw.exe` at sign-in: a
+  `squadbots-host.exe` and `squadbots-hostw.exe` in `resources/`. `squadbots-host install` writes the
+  per-user Run key (`HKCU\…\Run\SquadbotsHost`), which starts `squadbots-hostw.exe` at sign-in: a
   windowless launcher that runs the host with a hidden console (the agents share it, so none
   opens a window) and restarts it when it exits. App updates stop the host first, as on macOS.
   Agents start through `cmd /c` (`host/src/shell.rs`), setup terminals use ConPTY
@@ -81,7 +81,7 @@ The TUI connects to one host at a time, so it keeps its single roster.
   line hook (usage still comes from `claude -p /usage` and ACP), SSH tunnels to other
   computers, and `curl | bash` installers (npm installs and Claude Code's PowerShell installer
   work). The tray icon is the app icon; left-click opens the chat, right-click the menu.
-- **Remote screen** on macOS registers `CodyncScreen.app` (built from the Xcode `Screen` target)
+- **Remote screen** on macOS registers `SquadbotsScreen.app` (built from the Xcode `Screen` target)
   as an SMAppService agent; Linux starts its helper from the host, as before.
 - **Other computers in the account** are reached through this computer's own host and SSH
   tunnels only. The encrypted channel to account computers (`ChannelTransport`) wasn't ported:
@@ -95,9 +95,9 @@ The TUI connects to one host at a time, so it keeps its single roster.
 
 SSH host discovery preserves the remote login shell's `PATH`, then searches
 `/opt/homebrew/bin`, `/usr/local/bin`, `/home/linuxbrew/.linuxbrew/bin`,
-`~/.local/bin`, and `/Applications/Codync.app/Contents/Resources` (Electron) or
+`~/.local/bin`, and `/Applications/Squadbots.app/Contents/Resources` (Electron) or
 `Contents/MacOS` (older native apps). Custom prefixes or relocated app bundles
-must expose `codync-host` through the remote login shell's `PATH`.
+must expose `squadbots-host` through the remote login shell's `PATH`.
 Managed tunnels use `ssh -S none` to bypass connection sharing: the app's SSH
 child must own the listening socket and stay alive until disconnect. This keeps
 `ControlMaster` / `ControlPersist` in the user's config from transferring the
@@ -113,14 +113,14 @@ It uses port 19222 on the remote computer and leaves bots and settings unchanged
 cd apps/desktop
 npm ci
 npm run icons                       # macOS: SF Symbol masks
-npm run dev                         # Codync Dev, separate host on 19223
-CODYNC_PORT=19333 CODYNC_HOME=/path/to/home npm run dev   # against a manually run host
+npm run dev                         # Squadbots Dev, separate host on 19223
+SQUADBOTS_PORT=19333 SQUADBOTS_HOME=/path/to/home npm run dev   # against a manually run host
 npm run typecheck && npm test
 ```
 
-UI checks: `CODYNC_SHOW_INACTIVE=1` opens the window without taking focus,
-`CODYNC_DEBUG_OPEN=compose|group|plugins|computers|<bot name>` opens a screen, and
-`CODYNC_REMOTE_DEBUG=<port>` lets a script drive the renderer over the DevTools protocol.
+UI checks: `SQUADBOTS_SHOW_INACTIVE=1` opens the window without taking focus,
+`SQUADBOTS_DEBUG_OPEN=compose|group|plugins|computers|<bot name>` opens a screen, and
+`SQUADBOTS_REMOTE_DEBUG=<port>` lets a script drive the renderer over the DevTools protocol.
 Each packaging script names its environment:
 
 ```sh
@@ -132,15 +132,15 @@ npm run dist:win:dev      # / dist:win:main, on Windows (builds the bundled host
 
 They write `resources/account-config.json` for that environment, and the Mac ones build the
 bundled host (`tools/native-host.mjs`, universal, through rustup's pinned toolchain) for the same
-one, so app and host always match, plus the Codync Screen helper (`tools/native-screen.mjs`).
+one, so app and host always match, plus the Squadbots Screen helper (`tools/native-screen.mjs`).
 Extra electron-builder flags go after `--` (`npm run dist:mac:dev -- --dir --arm64`). The speech
 helper at the top of `electron-builder.yml` doesn't depend on the environment; place it first
 (the release workflow, `.github/workflows/release-desktop.yml`, shows how).
-`dist:mac:dev` signs with the team 7FUM8A8H72 development certificate (`CSC_NAME` in
+`dist:mac:dev` signs with the team TEAMID1234 development certificate (`CSC_NAME` in
 `package.json`): the Screen launch agent only runs code from that team, and the keychain holds
 another team's certificate electron-builder would otherwise pick. Update the name when it is
 renewed.
-Codync and Codync Dev can run side by side: separate app identities, host services, ports, data and login callbacks. See [Dev app isolation](../guides/dev-app.md) for the resource map and external signing/account setup.
+Squadbots and Squadbots Dev can run side by side: separate app identities, host services, ports, data and login callbacks. See [Dev app isolation](../guides/dev-app.md) for the resource map and external signing/account setup.
 
 For a local signed Mac build, explicitly select a development identity from the project's
 team with `-c.mac.identity="Apple Development: …"`; use `--dir --arm64` and
@@ -168,5 +168,5 @@ removed them is `git log --oneline -1 -- apps/macos`; its parent is the last Swi
 
 ```sh
 git show <commit>^:apps/macos/Views/ChatWindow.swift
-git worktree add ../codync-swiftui <commit>^
+git worktree add ../squadbots-swiftui <commit>^
 ```

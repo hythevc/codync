@@ -15,17 +15,17 @@ const locations = [
   '/usr/local/bin',
   '/home/linuxbrew/.linuxbrew/bin',
   '/user home/.local/bin',
-  '/Applications/Codync.app/Contents/Resources',
-  '/Applications/Codync.app/Contents/MacOS',
+  '/Applications/Squadbots.app/Contents/Resources',
+  '/Applications/Squadbots.app/Contents/MacOS',
 ]
 
 function probe(installed: string[]) {
-  const root = mkdtempSync(join(tmpdir(), 'codync-ssh-'))
+  const root = mkdtempSync(join(tmpdir(), 'squadbots-ssh-'))
   try {
     for (const location of installed) {
       const directory = join(root, location)
       mkdirSync(directory, { recursive: true })
-      const binary = join(directory, 'codync-host')
+      const binary = join(directory, 'squadbots-host')
       writeFileSync(binary, '#!/bin/sh\nprintf "%s\\n" "$0" "$@"\n')
       chmodSync(binary, 0o755)
     }
@@ -46,14 +46,14 @@ for (const location of locations) {
   test(`SSH finds a host installed in ${location}`, { skip: process.platform === 'win32' }, () => {
     const result = probe([location])
     assert.equal(result.status, 0)
-    assert.deepEqual(result.lines, [join(result.root, location, 'codync-host'), 'info', '--json', '--port', '19222'])
+    assert.deepEqual(result.lines, [join(result.root, location, 'squadbots-host'), 'info', '--json', '--port', '19222'])
   })
 }
 
 test('SSH preserves the host selected by the remote PATH', { skip: process.platform === 'win32' }, () => {
   const result = probe(locations)
   assert.equal(result.status, 0)
-  assert.equal(result.lines[0], join(result.root, 'custom/bin/codync-host'))
+  assert.equal(result.lines[0], join(result.root, 'custom/bin/squadbots-host'))
 })
 
 test('SSH reports command not found when no installation is reachable', { skip: process.platform === 'win32' }, () => {
@@ -62,18 +62,18 @@ test('SSH reports command not found when no installation is reachable', { skip: 
 
 for (const installed of ['mac', 'linux', 'production-only'] as const) {
   test(`development SSH uses only its own host with ${installed} installed`, { skip: process.platform === 'win32' }, () => {
-    const root = mkdtempSync(join(tmpdir(), 'codync-dev-ssh-'))
+    const root = mkdtempSync(join(tmpdir(), 'squadbots-dev-ssh-'))
     try {
       const home = join(root, 'user home')
-      const mac = join(root, 'Applications/Codync Dev.app/Contents/Resources/codync-host')
-      const linux = join(home, '.local/bin/codync-dev-host')
-      const prod = join(home, '.local/bin/codync-host')
+      const mac = join(root, 'Applications/Squadbots Dev.app/Contents/Resources/squadbots-host')
+      const linux = join(home, '.local/bin/squadbots-dev-host')
+      const prod = join(home, '.local/bin/squadbots-host')
       for (const bin of [prod, ...(installed === 'mac' ? [mac] : installed === 'linux' ? [linux] : [])]) {
         mkdirSync(join(bin, '..'), { recursive: true })
-        writeFileSync(bin, '#!/bin/sh\nprintf "%s\\n" "$0" "$CODYNC_HOME" "$@"\n')
+        writeFileSync(bin, '#!/bin/sh\nprintf "%s\\n" "$0" "$SQUADBOTS_HOME" "$@"\n')
         chmodSync(bin, 0o755)
       }
-      const command = remoteInfoCommand(19223, '.codync-dev')
+      const command = remoteInfoCommand(19223, '.squadbots-dev')
         .replace(/^sh -lc '/, '').replace(/'$/, '')
         .replaceAll('/Applications/', `${root}/Applications/`)
       const result = spawnSync('/bin/sh', ['-c', command], {
@@ -81,7 +81,7 @@ for (const installed of ['mac', 'linux', 'production-only'] as const) {
       })
       assert.equal(result.status, installed === 'production-only' ? 127 : 0)
       if (installed !== 'production-only') {
-        assert.deepEqual(result.stdout.trim().split('\n'), [installed === 'mac' ? mac : linux, join(home, '.codync-dev'), 'info', '--json', '--port', '19223'])
+        assert.deepEqual(result.stdout.trim().split('\n'), [installed === 'mac' ? mac : linux, join(home, '.squadbots-dev'), 'info', '--json', '--port', '19223'])
       }
     } finally {
       rmSync(root, { recursive: true, force: true })
@@ -95,7 +95,7 @@ const profile: SSHProfile = {
 }
 
 function withConfig(master: string, run: (config: string, home: string) => void) {
-  const root = mkdtempSync(join(tmpdir(), 'codync-ssh-config-'))
+  const root = mkdtempSync(join(tmpdir(), 'squadbots-ssh-config-'))
   try {
     const config = join(root, 'config')
     writeFileSync(config, `Host test-mini
@@ -141,7 +141,7 @@ for (const master of ['no', 'auto', 'yes', 'autoask']) {
       assert.equal(values.get('batchmode'), 'yes')
       assert.equal(values.get('localforward')?.replace(/[\[\]]/g, ''), '127.0.0.1:19333 127.0.0.1:19222')
       assert.ok(values.get('userknownhostsfile')?.includes(`${home}/.ssh/known_hosts`))
-      assert.ok(values.get('userknownhostsfile')?.includes(`${home}/.codync/ssh_known_hosts`))
+      assert.ok(values.get('userknownhostsfile')?.includes(`${home}/.squadbots/ssh_known_hosts`))
     })
   })
 }
@@ -167,12 +167,12 @@ for (const kind of ['info', 'tunnel', 'resolve'] as const) {
 }
 
 for (const [preferred, fallback] of [
-  ['/opt/homebrew/bin', '/Applications/Codync.app/Contents/Resources'],
-  ['/Applications/Codync.app/Contents/Resources', '/Applications/Codync.app/Contents/MacOS'],
+  ['/opt/homebrew/bin', '/Applications/Squadbots.app/Contents/Resources'],
+  ['/Applications/Squadbots.app/Contents/Resources', '/Applications/Squadbots.app/Contents/MacOS'],
 ]) {
   test(`SSH prefers ${preferred} over ${fallback}`, { skip: process.platform === 'win32' }, () => {
     const result = probe([preferred, fallback])
     assert.equal(result.status, 0)
-    assert.equal(result.lines[0], join(result.root, preferred, 'codync-host'))
+    assert.equal(result.lines[0], join(result.root, preferred, 'squadbots-host'))
   })
 }

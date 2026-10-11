@@ -12,7 +12,7 @@ import { RoutinesView } from '../routines/RoutinesView'
 import { MacChatButton } from './MacChatButton'
 import '../bots/bots.css'
 
-const isMac = window.codync.platform === 'darwin'
+const isMac = window.squadbots.platform === 'darwin'
 
 /** The inspector beside a conversation: the computer, the agent, and the bot's settings. */
 export function DetailsPanel({ botId, routineId, editing, setEditing, editGroup, share, close }: {
@@ -173,7 +173,7 @@ function AgentSummary({ bot }: { bot: Bot }) {
         <AgentIcon registry={store.hello?.backends.find((b) => b.id === bot.backend)?.registry} size={14} />
         <span>{store.backendName(bot.backend)}</span>
       </InfoRow>
-      <InfoRow label={bot.managedWorkspace ? 'Workspace' : 'Folder'} title={bot.managedWorkspace ? 'Personal workspace, managed by Codync' : bot.cwd}>
+      <InfoRow label={bot.managedWorkspace ? 'Workspace' : 'Folder'} title={bot.managedWorkspace ? 'Personal workspace, managed by Squadbots' : bot.cwd}>
         {bot.managedWorkspace ? 'Personal' : folderName(bot)}
       </InfoRow>
       {bot.model ? <InfoRow label="Model">{bot.model}</InfoRow> : null}

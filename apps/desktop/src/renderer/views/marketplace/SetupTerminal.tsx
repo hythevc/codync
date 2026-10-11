@@ -14,7 +14,7 @@ import { errorText, market, type AuthMethod, type SetupStep } from './market-mod
 import { ScreenHeader } from './pieces'
 
 const openLink = (uri: string) => {
-  if (/^https?:/i.test(uri)) window.codync.app.openExternal(uri)
+  if (/^https?:/i.test(uri)) window.squadbots.app.openExternal(uri)
 }
 
 /**
@@ -24,7 +24,7 @@ const openLink = (uri: string) => {
 export function SetupTerminalView({ backend, step, method, back }: {
   backend: Backend
   step: SetupStep
-  /** A terminal sign-in method the agent offered; null runs Codync's own command. */
+  /** A terminal sign-in method the agent offered; null runs Squadbots's own command. */
   method?: AuthMethod | null
   /** Back to the agent's sheet (the terminal is a step inside it). */
   back: () => void

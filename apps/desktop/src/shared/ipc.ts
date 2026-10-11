@@ -3,7 +3,7 @@ import type { SSHBridge } from './ssh'
 import type { ScreenAgentState } from './computer-access'
 
 // The bridge between the main process (host lifecycle, loopback HTTP, tray, windows)
-// and the renderer (stores and UI). Exposed as `window.codync` by the preload script.
+// and the renderer (stores and UI). Exposed as `window.squadbots` by the preload script.
 
 export type HostState =
   | { kind: 'missingBinary' }
@@ -22,7 +22,7 @@ export interface LocalHost {
 export interface HostSnapshot {
   state: HostState
   local: LocalHost | null
-  /** Started against a manually run host (`CODYNC_PORT`). */
+  /** Started against a manually run host (`SQUADBOTS_PORT`). */
   dev: boolean
   logPath: string
 }
@@ -103,7 +103,7 @@ export type SpeechEvent =
   | { type: 'stopped' }
   | { type: 'error'; message: string }
 
-export interface CodyncBridge {
+export interface SquadbotsBridge {
   platform: 'darwin' | 'linux' | 'win32'
   appName: string
   appScheme: string
@@ -111,7 +111,7 @@ export interface CodyncBridge {
   appVersion: string
   /** The computer's name ("Kevin's MacBook Pro"). */
   computerName: string
-  /** Screenshot/UI checks: CODYNC_DEBUG_OPEN=compose | group | plugins | computers | <bot name>. */
+  /** Screenshot/UI checks: SQUADBOTS_DEBUG_OPEN=compose | group | plugins | computers | <bot name>. */
   debugOpen: string | null
   host: {
     snapshot(): Promise<HostSnapshot>
@@ -131,7 +131,7 @@ export interface CodyncBridge {
     onChange(cb: (s: AccountState) => void): () => void
     signIn(provider: 'apple' | 'google'): Promise<void>
     signOut(): Promise<void>
-    /** The signed-in session's JWT for the Codync cloud. */
+    /** The signed-in session's JWT for the Squadbots cloud. */
     token(): Promise<string>
   }
   /** On-device speech recognition (macOS: SFSpeechRecognizer in a helper; unavailable on Linux). */
@@ -145,7 +145,7 @@ export interface CodyncBridge {
     onEvent(cb: (e: SpeechEvent) => void): () => void
   }
   ssh: SSHBridge
-  /** The Codync cloud's `/v1` API with the signed-in session (and the device key for `signed`). */
+  /** The Squadbots cloud's `/v1` API with the signed-in session (and the device key for `signed`). */
   cloud: {
     request(method: string, path: string, body: unknown, signed: boolean): Promise<{ ok: true; value: unknown } | { ok: false; error: { status: number; code: string; message: string | null } }>
   }
@@ -180,10 +180,10 @@ export interface CodyncBridge {
     openSettings(url: string): void
     /**
      * Opens `url` in the system browser and resolves with the URL it returns to on `scheme`
-     * (`codync://…`), like ASWebAuthenticationSession. Rejects when cancelled or timed out.
+     * (`squadbots://…`), like ASWebAuthenticationSession. Rejects when cancelled or timed out.
      */
     authenticate(url: string, scheme: string): Promise<string>
-    /** macOS: registers or removes the Codync Screen agent (SMAppService). */
+    /** macOS: registers or removes the Squadbots Screen agent (SMAppService). */
     screenAgentState(): Promise<ScreenAgentState>
     setScreenAgent(on: boolean): Promise<{ needsApproval: boolean }>
     syncScreenAgent(enabled: boolean): Promise<{ needsApproval: boolean }>

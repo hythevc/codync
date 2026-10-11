@@ -341,7 +341,7 @@ impl Actor {
 }
 
 /// Told to a bot whose turn the previous host process cut off (Grok Bot's upgrade resume).
-const RESUME_PROMPT: &str = "[Codync restarted on this computer and interrupted you mid-task. You've been resumed with your full conversation intact. Continue exactly where you left off and finish what you were doing. If your previous step already completed an action, do NOT repeat it — just carry on from there.]";
+const RESUME_PROMPT: &str = "[Squadbots restarted on this computer and interrupted you mid-task. You've been resumed with your full conversation intact. Continue exactly where you left off and finish what you were doing. If your previous step already completed an action, do NOT repeat it — just carry on from there.]";
 
 /// An interrupted turn older than this isn't resumed.
 const STALE_RESUME_MS: i64 = 60 * 60 * 1000;

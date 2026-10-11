@@ -95,7 +95,7 @@ impl Actor {
     /// ACP connectors, team collaboration, and optional computer control.
     pub(super) fn mcp_servers(&self) -> Result<Value> {
         let Ok(exe) = std::env::current_exe() else {
-            tracing::warn!("can't locate codync-host for MCP servers");
+            tracing::warn!("can't locate squadbots-host for MCP servers");
             return Ok(json!([]));
         };
         let port = self.hub.port;
@@ -117,7 +117,7 @@ impl Actor {
         ];
         for name in builtin.into_iter().flatten() {
             let env = if name == "memory" {
-                json!([{"name":"CODYNC_MEMORY_LANE", "value":self.slot(&self.lane).unwrap_or_default()}])
+                json!([{"name":"SQUADBOTS_MEMORY_LANE", "value":self.slot(&self.lane).unwrap_or_default()}])
             } else {
                 json!([])
             };
@@ -334,7 +334,7 @@ pub(crate) async fn start_agent(command: &str, cwd: &str, env: &[(String, String
                     "terminal": false,
                     "session": {"compaction": {}},
                 },
-                "clientInfo": {"name": "codync", "title": "Codync", "version": env!("CARGO_PKG_VERSION")},
+                "clientInfo": {"name": "squadbots", "title": "Squadbots", "version": env!("CARGO_PKG_VERSION")},
             }),
         ),
     )

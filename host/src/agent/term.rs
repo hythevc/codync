@@ -91,7 +91,7 @@ impl Terms {
     }
 
     /// Starts `step` for `backend` (a sign-in `method` the agent advertised, or
-    /// Codync's own command for it), or returns the one already running.
+    /// Squadbots's own command for it), or returns the one already running.
     pub async fn start(
         self: &Arc<Self>,
         backend: &str,
@@ -104,7 +104,7 @@ impl Terms {
         let name = h.map_or(backend, |h| h.name);
         let command = match step {
             Step::Install => {
-                let h = h.ok_or_else(|| anyhow!("Codync downloads {name} by itself"))?;
+                let h = h.ok_or_else(|| anyhow!("Squadbots downloads {name} by itself"))?;
                 h.install.and_then(backends::Install::command).ok_or_else(|| anyhow!("{}", h.setup))?
             }
             // Some CLIs (codex) delete the current credentials the moment a new sign-in starts.

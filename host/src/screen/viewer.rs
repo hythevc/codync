@@ -56,7 +56,7 @@ impl Screen {
     pub async fn offer(&self, owner: &str, sdp: &str, session: Option<&str>, display: Option<u32>) -> Result<Value> {
         let link = self.link()?;
         if !self.status.locked().capture {
-            bail!("Codync isn't allowed to record this computer's screen yet. Allow it in System Settings there.");
+            bail!("Squadbots isn't allowed to record this computer's screen yet. Allow it in System Settings there.");
         }
         let session = match session {
             Some(id) => id.to_owned(),

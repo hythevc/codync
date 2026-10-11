@@ -13,25 +13,25 @@ const metadata = JSON.parse(readFileSync(new URL('../../package.json', import.me
 test('Linux packages and Windows installation resources have separate development names', () => {
   const mainInfo = new AppInfo({ config: prod, metadata })
   const devInfo = new AppInfo({ config: dev, metadata: { ...metadata, ...dev.extraMetadata } })
-  assert.equal(mainInfo.linuxPackageName, 'codync-desktop')
-  assert.equal(devInfo.linuxPackageName, 'codync-desktop-dev')
+  assert.equal(mainInfo.linuxPackageName, 'squadbots-desktop')
+  assert.equal(devInfo.linuxPackageName, 'squadbots-desktop-dev')
   assert.notEqual(devInfo.updaterCacheDirName, mainInfo.updaterCacheDirName)
   assert.notEqual(getWindowsInstallationDirName(devInfo, true), getWindowsInstallationDirName(mainInfo, true))
   assert.notEqual(getWindowsInstallationAppPackageName(devInfo.name), getWindowsInstallationAppPackageName(mainInfo.name))
-  assert.equal(dev.extraMetadata.desktopName, 'codync-dev.desktop')
+  assert.equal(dev.extraMetadata.desktopName, 'squadbots-dev.desktop')
 })
 
 test('development packaging registers only development callbacks and background helpers', () => {
-  assert.equal(dev.appId, 'com.pokai.Codync.dev')
-  assert.equal(dev.productName, 'Codync Dev')
+  assert.equal(dev.appId, 'ai.squadbots.Squadbots.dev')
+  assert.equal(dev.productName, 'Squadbots Dev')
   assert.equal(dev.publish, null)
-  assert.ok(new RegExp(dev.mac.signIgnore[0]).test('CodyncDevScreen.app/Contents/Helpers/cua-driver'))
-  assert.deepEqual(dev.protocols.flatMap((p: { schemes: string[] }) => p.schemes), ['codync-dev', 'com.pokai.Codync.dev'])
+  assert.ok(new RegExp(dev.mac.signIgnore[0]).test('SquadbotsDevScreen.app/Contents/Helpers/cua-driver'))
+  assert.deepEqual(dev.protocols.flatMap((p: { schemes: string[] }) => p.schemes), ['squadbots-dev', 'ai.squadbots.Squadbots.dev'])
   assert.deepEqual(dev.mac.extraFiles.map((f: { to: string }) => f.to), [
-    'Library/LoginItems/CodyncDevScreen.app',
-    'Library/LaunchAgents/com.pokai.Codync.dev.screen.plist',
+    'Library/LoginItems/SquadbotsDevScreen.app',
+    'Library/LaunchAgents/ai.squadbots.Squadbots.dev.screen.plist',
   ])
-  assert.ok(dev.win.extraResources.some((f: { to: string }) => f.to === 'codync-dev-hostw.exe'))
-  assert.ok(!dev.win.extraResources.some((f: { to: string }) => f.to === 'codync-hostw.exe'))
-  assert.equal(dev.linux.executableName, 'codync-dev')
+  assert.ok(dev.win.extraResources.some((f: { to: string }) => f.to === 'squadbots-dev-hostw.exe'))
+  assert.ok(!dev.win.extraResources.some((f: { to: string }) => f.to === 'squadbots-hostw.exe'))
+  assert.equal(dev.linux.executableName, 'squadbots-dev')
 })

@@ -138,7 +138,7 @@ impl Actor {
         }
         if remind_files && self.active_group.is_none() && self.active_request.is_none() && self.active_routine.is_none()
         {
-            prompt.push_str("\n\n[Codync: send_file(path, name?) shares any regular file up to 100 MiB as a downloadable card. Use it instead of sending a local path.]");
+            prompt.push_str("\n\n[Squadbots: send_file(path, name?) shares any regular file up to 100 MiB as a downloadable card. Use it instead of sending a local path.]");
         }
         self.hub.set_runtime(&self.id(), |r| r.activity = "Thinking…".into());
         let acp = self.conn.as_ref().ok_or_else(|| anyhow!("agent not running"))?.acp.clone();

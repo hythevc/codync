@@ -9,7 +9,7 @@
 - **Nowdex 的狀態首頁**：小型 provider 圖示、緊湊的用量卡片、細刻度進度條、標籤靠左／數值靠右、次要重置時間。
 - **Nomo 的 Home 設定頁**：簡短介紹、依實際狀態完成的設定清單、加入 widget 與編輯 widget 的分段教學。
 
-這次觀察到的是上述頁面，未完整操作兩款 app 的內部 widget 選擇頁。Codync 以自己的 SwiftUI 元件、角色圖示與教學重建這些模式，沒有匯入兩款 app 的程式碼、影片或素材。
+這次觀察到的是上述頁面，未完整操作兩款 app 的內部 widget 選擇頁。Squadbots 以自己的 SwiftUI 元件、角色圖示與教學重建這些模式，沒有匯入兩款 app 的程式碼、影片或素材。
 
 ## Onboarding 與帳號
 
@@ -17,7 +17,7 @@
 2. 儲存第一台配對電腦後，記錄此裝置的 `onboardingCompleted`。
 3. 既有已配對安裝自動視為完成 onboarding。
 4. 完成後才顯示帳號入口；切換到沒有電腦的帳號，或解除配對後，入口仍保留，避免無法切回原帳號。
-5. 「帳號」代表 Codync 的 Google／Clerk 登入身分。帳號與 computer 是不同概念。
+5. 「帳號」代表 Squadbots 的 Google／Clerk 登入身分。帳號與 computer 是不同概念。
 
 目前完成條件沿用現有的配對資料儲存事件，不代表已驗證雲端登入或 host 當下在線。Welcome、配對與帳號電腦的選擇由 RootView 和帳號狀態共同決定。
 
@@ -38,7 +38,7 @@ Widget 與 Live Activity 的頭像用 `CharacterAvatar(… still: true)`：畫�
 - 採平面深淺色表面、小型圖示、11–13 pt 標籤；大字只用於主要數值。
 - App 的 Usage 卡片同步縮小字級、圖示、內距，並使用同一款刻度條。
 - 底部的 State 分頁以頂部切換呈現 Widget／Live Activity／Dynamic Island 三頁；用量上限從右上角圖示開成 sheet。Computers & settings 不再放這些入口。
-- Widget 頁提供類型／provider／大小切換、三種主畫面尺寸預覽與設定教學。加入 widget 的教學（`WidgetSetupDemo.swift`）用 SwiftUI 畫出一支 iPhone，手指實際演出長按、Edit、Add Widget、找到 Codync、Add Widget、Done；整段由單一時鐘驅動，會循環，可暫停／播放，也可以拖曳進度條。
+- Widget 頁提供類型／provider／大小切換、三種主畫面尺寸預覽與設定教學。加入 widget 的教學（`WidgetSetupDemo.swift`）用 SwiftUI 畫出一支 iPhone，手指實際演出長按、Edit、Add Widget、找到 Squadbots、Add Widget、Done；整段由單一時鐘驅動，會循環，可暫停／播放，也可以拖曳進度條。
 - 「Lock Screen widgets」頁可切換 Bots／Usage limits，預覽圓形、矩形與行內形式。正式 widget 與預覽共用 `AccessoryWidgetCard`。
 - 設定清單讀取實際電腦配對狀態與 `WidgetCenter` 的已安裝配置；不以點過教學當作完成。
 - 查詢失敗時顯示錯誤與「Check again」，不會永久停在載入狀態。
@@ -46,7 +46,7 @@ Widget 與 Live Activity 的頭像用 `CharacterAvatar(… still: true)`：畫�
 - App 教學、設定清單與說明支援 Dynamic Type；無障礙大字體改用選單切換類型／provider。固定大小的 widget 保留緊湊數值，並提供完整的 VoiceOver 用量與重置描述。
 - 教學涵蓋 Home Screen 與 Lock Screen；新增 WidgetKit 原生預覽涵蓋小／中尺寸、矩形／圓形／行內配件與空狀態。
 
-`apps/ios/Kit/Sources/CodyncKit/Design/WidgetCards.swift` 是共用繪製元件；`apps/ios/Views/WidgetGalleryView.swift` 與 `apps/ios/Widgets/CodyncWidgets.swift` 共用它，減少預覽與實際 widget 的差異。
+`apps/ios/Kit/Sources/SquadbotsKit/Design/WidgetCards.swift` 是共用繪製元件；`apps/ios/Views/WidgetGalleryView.swift` 與 `apps/ios/Widgets/SquadbotsWidgets.swift` 共用它，減少預覽與實際 widget 的差異。
 
 ## Live Activity 與 Dynamic Island
 
@@ -66,8 +66,8 @@ State 分頁的 Live Activity 頁顯示鎖定畫面形式，Dynamic Island 頁�
 模擬器截圖看不到 Live Activity，所以 Live Activity、動態島（各狀態 × Lock Screen／Compact／Minimal／Expanded，淺色與深色）和 widget 卡片改用 render 測試輸出 PNG 檢查：
 
 ```sh
-cd apps/ios/Kit && TEST_RUNNER_CODYNC_RENDER_DIR=<輸出資料夾> xcodebuild test -scheme CodyncKit-Package \
-  -derivedDataPath ../../../build/dd -destination 'platform=iOS Simulator,id=<sim-id>' '-only-testing:CodyncKitTests/renderSurfaces()'
+cd apps/ios/Kit && TEST_RUNNER_SQUADBOTS_RENDER_DIR=<輸出資料夾> xcodebuild test -scheme SquadbotsKit-Package \
+  -derivedDataPath ../../../build/dd -destination 'platform=iOS Simulator,id=<sim-id>' '-only-testing:SquadbotsKitTests/renderSurfaces()'
 ```
 
 實際形式由 iOS 根據裝置、活動數量與互動決定；App 內的形式選單只控制設計預覽。[Apple Live Activities 設計指南](https://developer.apple.com/design/human-interface-guidelines/live-activities)
@@ -98,7 +98,7 @@ Dynamic Island 固定黑底，文字採淺色；Lock Screen 卡片配合系統�
 
 ## 驗證
 
-在 `apps/ios/Kit` 以 iOS 模擬器執行 `xcodebuild test -scheme CodyncKit-Package`檢查共用邏輯。系統 WidgetKit／ActivityKit 預覽在 `apps/ios/Widgets/WidgetPreviews.swift`。
+在 `apps/ios/Kit` 以 iOS 模擬器執行 `xcodebuild test -scheme SquadbotsKit-Package`檢查共用邏輯。系統 WidgetKit／ActivityKit 預覽在 `apps/ios/Widgets/WidgetPreviews.swift`。
 
 實機仍需分別確認加入 Home／Lock Screen widget、編輯 provider、跨帳號切換、背景刷新，以及 Live Activity／APNs 更新。共用圖片與 build 成功不等於這些系統整合已通過。[歷史檢查紀錄](../archive/mobile-widgets-verification-2026-09-26.md) 保留當時的測試範圍與操作限制。
 
@@ -121,4 +121,4 @@ Bot 的角色頭像使用 `CharacterAvatar` 點陣；provider 圖示由 `Provide
 
 App 內動畫最多 30 fps；離開畫面、App 非 active 或啟用 Reduce Motion 時顯示靜態幀。Widget、Live Activity 與 Dynamic Island 明確傳入 `animated: false`，不依賴持續動畫計時。狀態仍隨既有資料更新。
 
-上游 MIT 授權全文隨 `CodyncKit` resource bundle 發佈，位於 `apps/ios/Kit/Sources/CodyncKit/Resources/ThirdPartyNotices/thinking-orbs-LICENSE.txt`。`ThinkingOrbGeometryTests` 使用上游獨立 golden vectors 的取樣，驗證四種造型 × 兩尺寸 × 四時間點的 dot／line 數量、位置、半徑、墨色及深度順序。其餘五種上游造型暫未移植；有對應產品狀態時再加入。
+上游 MIT 授權全文隨 `SquadbotsKit` resource bundle 發佈，位於 `apps/ios/Kit/Sources/SquadbotsKit/Resources/ThirdPartyNotices/thinking-orbs-LICENSE.txt`。`ThinkingOrbGeometryTests` 使用上游獨立 golden vectors 的取樣，驗證四種造型 × 兩尺寸 × 四時間點的 dot／line 數量、位置、半徑、墨色及深度順序。其餘五種上游造型暫未移植；有對應產品狀態時再加入。

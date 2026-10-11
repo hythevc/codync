@@ -5,7 +5,7 @@ This is the map of the current repository. Paths below are repository-relative. 
 ## Top-level layout
 
 ```text
-Codync/
+Squadbots/
 ├── host/                      # Rust daemon and terminal client
 │   ├── src/
 │   │   ├── main.rs            # CLI entry, shared helpers (LockExt, http)
@@ -22,17 +22,17 @@ Codync/
 │   └── tests/                 # Host integration tests and scripted ACP agents
 ├── apps/
 │   ├── project.yml            # XcodeGen source of truth for every Apple target
-│   ├── Codync.xcodeproj/      # Generated Xcode project
+│   ├── Squadbots.xcodeproj/      # Generated Xcode project
 │   ├── shared/Config/         # {dev,main}.plist: environment for the iPhone and desktop apps
 │   ├── ios/                   # App/, Views/, Resources/, Widgets/, NotificationService/
 │   │   └── Kit/               # The iPhone app's Swift package
 │   │       ├── Sources/
-│   │       │   ├── CodyncKit/  # Wire models, transports, design; widget-safe
+│   │       │   ├── SquadbotsKit/  # Wire models, transports, design; widget-safe
 │   │       │   │   ├── Client/
 │   │       │   │   ├── Models/
 │   │       │   │   ├── Design/
 │   │       │   │   └── Resources/
-│   │       │   └── CodyncUI/   # Stores, screens and custom controls
+│   │       │   └── SquadbotsUI/   # Stores, screens and custom controls
 │   │       │       ├── Store/
 │   │       │       ├── Bots/
 │   │       │       ├── Thread/
@@ -42,12 +42,12 @@ Codync/
 │   │       │       ├── Routines/
 │   │       │       ├── Usage/
 │   │       │       └── Resources/
-│   │       └── Tests/         # CodyncKitTests and CodyncUITests
+│   │       └── Tests/         # SquadbotsKitTests and SquadbotsUITests
 │   ├── desktop/               # Electron app for macOS, Linux and Windows (see desktop-app.md)
 │   │   ├── src/main/          # Host service, tray, account, updates, SSH, screen, speech
-│   │   ├── src/preload/       # window.codync bridge
+│   │   ├── src/preload/       # window.squadbots bridge
 │   │   ├── src/renderer/      # React UI: store/, components/, views/
-│   │   └── native/            # codync-speech (macOS on-device speech helper)
+│   │   └── native/            # squadbots-speech (macOS on-device speech helper)
 │   ├── screen-macos/          # macOS screen helper (Xcode Screen target)
 │   └── screen-linux/          # Linux portal/GStreamer screen helper
 ├── cloud/                     # Account API + encrypted relay Worker and Durable Object
@@ -69,10 +69,10 @@ Codync/
 
 - `apps/desktop/` — desktop app for macOS, Linux and Windows (Electron; `npm run dev`, packaged by `.github/workflows/release-desktop.yml`)
 - `iOS` (`apps/ios/`) — iOS app
-- `Screen` (`apps/screen-macos/`) — Codync Screen: capture, input and WebRTC for Remote screen, embedded in the macOS desktop app (`Contents/Library/LoginItems`); starts the computer-use driver it carries in `Contents/Helpers`
-- `apps/screen-linux/` — `codync-screen` (Rust, GStreamer + xdg portals), the Linux Remote screen helper
-- `Widgets` (`apps/ios/Widgets/`) — usage widget + bot Live Activity (bundle id `com.pokai.Codync.ios.LiveActivity`)
-- `CodyncKit` (`apps/ios/Kit/`) — the iPhone app's Swift package: `CodyncKit` + `CodyncUI` libraries (tests: `xcodebuild test -scheme CodyncKit-Package` on an iOS simulator)
+- `Screen` (`apps/screen-macos/`) — Squadbots Screen: capture, input and WebRTC for Remote screen, embedded in the macOS desktop app (`Contents/Library/LoginItems`); starts the computer-use driver it carries in `Contents/Helpers`
+- `apps/screen-linux/` — `squadbots-screen` (Rust, GStreamer + xdg portals), the Linux Remote screen helper
+- `Widgets` (`apps/ios/Widgets/`) — usage widget + bot Live Activity (bundle id `ai.squadbots.Squadbots.ios.LiveActivity`)
+- `SquadbotsKit` (`apps/ios/Kit/`) — the iPhone app's Swift package: `SquadbotsKit` + `SquadbotsUI` libraries (tests: `xcodebuild test -scheme SquadbotsKit-Package` on an iOS simulator)
 
 ## Where to make a change
 
@@ -89,22 +89,22 @@ Codync/
 | Agent discovery, sign-in, setup terminal | `host/src/agent/backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
 | Marketplace, Composio, connector OAuth | `host/src/market/` |
 | Screen bridge and built-in MCP tools | `host/src/screen/`, `mcp.rs` |
-| Swift transport and cloud API | `apps/ios/Kit/Sources/CodyncKit/Client/` |
-| Account aggregation / one host mirror | `apps/ios/Kit/Sources/CodyncUI/Store/AccountStore.swift` / `BotStore.swift` (+ `BotStore+Connection`, `+Sync`, `+Sending`, `+Actions`, `+Plugins`, `+Cache`) |
-| iPhone chat, replies, composer and trace | `apps/ios/Kit/Sources/CodyncUI/Thread/` |
-| Reusable iPhone UI chrome | `apps/ios/Kit/Sources/CodyncUI/Chrome.swift`, `Controls.swift`, `Platform.swift` |
+| Swift transport and cloud API | `apps/ios/Kit/Sources/SquadbotsKit/Client/` |
+| Account aggregation / one host mirror | `apps/ios/Kit/Sources/SquadbotsUI/Store/AccountStore.swift` / `BotStore.swift` (+ `BotStore+Connection`, `+Sync`, `+Sending`, `+Actions`, `+Plugins`, `+Cache`) |
+| iPhone chat, replies, composer and trace | `apps/ios/Kit/Sources/SquadbotsUI/Thread/` |
+| Reusable iPhone UI chrome | `apps/ios/Kit/Sources/SquadbotsUI/Chrome.swift`, `Controls.swift`, `Platform.swift` |
 | iOS navigation, pairing, account settings | `apps/ios/Views/RootView.swift`, `BotListView.swift`, `PairingView.swift`, `AccountSwitcherView.swift`, `SettingsView.swift` |
 | Apple account sessions / public environment config | `apps/ios/App/AccountSession.swift`, `apps/shared/Config/` |
 | Desktop local host / SSH lifecycle | `apps/desktop/src/main/host-controller.ts`, `ssh.ts` |
 | Desktop store, chat and controls | `apps/desktop/src/renderer/store/bot-store.ts` (actions; state in `bot-mirror.ts`, events stream in `bot-sync.ts`), `views/thread/`, `components/` |
 | Cloud routes / authentication / relay | `cloud/src/index.ts`, `api.ts`, `routes/`, `auth.ts`, `relay.ts` |
 | Push encryption / APNs delivery / decryption | `host/src/remote/push.rs`, `relay/src/`, `apps/ios/NotificationService/` |
-| Widget and activity rendering | `apps/ios/Kit/Sources/CodyncKit/Design/`, `apps/ios/Widgets/` |
+| Widget and activity rendering | `apps/ios/Kit/Sources/SquadbotsKit/Design/`, `apps/ios/Widgets/` |
 
 ## Dependency rules
 
-- `CodyncKit` owns serializable models, clients and rendering primitives shared with widgets. It must not import `CodyncUI` or ClerkKit.
-- `CodyncUI` owns the iPhone app's observable stores and screens. App-specific lifecycle, OAuth configuration and device hooks belong in `apps/`.
+- `SquadbotsKit` owns serializable models, clients and rendering primitives shared with widgets. It must not import `SquadbotsUI` or ClerkKit.
+- `SquadbotsUI` owns the iPhone app's observable stores and screens. App-specific lifecycle, OAuth configuration and device hooks belong in `apps/`.
 - Each `BotStore` (Swift, and its TypeScript port in the desktop app) talks to one computer. `AccountStore` aggregates stores and routes by `BotReference`; bare bot IDs are not globally unique.
 - The host owns routing, reply counts, permissions and group turn scheduling. Clients render these results; they do not reimplement host policy.
 - `cloud/` transports encrypted chat traffic and manages account metadata. `relay/` delivers APNs pushes. The two Workers have separate configuration and tests.

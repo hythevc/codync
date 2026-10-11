@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 /// Use the checksum-verified release fixture so isolated hosts don't each download it.
 pub fn seed_memory_runtime(home: &std::path::Path) {
-    let Some(binary) = std::env::var_os("CODYNC_TEST_ENGRAM") else {
+    let Some(binary) = std::env::var_os("SQUADBOTS_TEST_ENGRAM") else {
         return;
     };
     let dir = home.join("engram/3.2.1");

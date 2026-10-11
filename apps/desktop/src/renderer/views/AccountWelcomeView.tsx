@@ -7,7 +7,7 @@ import { useReduceMotion } from '../lib/theme'
 import { useAccount } from '../store/account'
 import googleLogo from '../assets/google.svg'
 
-const deviceName = window.codync.platform === 'darwin' ? 'Mac' : 'computer'
+const deviceName = window.squadbots.platform === 'darwin' ? 'Mac' : 'computer'
 
 /** First-run account choice. A restored session skips this screen as soon as it is back. */
 export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
@@ -87,7 +87,7 @@ export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
             )}
           </Button>
           {!account.isConfigured ? (
-            <div style={{ ...font('footnote'), color: 'var(--tertiary)' }}>Sign-in isn't configured in this build. You can still use Codync on this {deviceName}.</div>
+            <div style={{ ...font('footnote'), color: 'var(--tertiary)' }}>Sign-in isn't configured in this build. You can still use Squadbots on this {deviceName}.</div>
           ) : null}
           {account.errorMessage ? <div style={{ ...font('footnote'), color: 'var(--warning)' }}>{account.errorMessage}</div> : null}
         </div>

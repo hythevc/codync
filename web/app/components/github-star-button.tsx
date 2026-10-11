@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { GithubLogo, Star } from "@phosphor-icons/react";
 import { GITHUB } from "../links";
 
-const REPO_API = "https://api.github.com/repos/leepokai/Codync";
+const REPO_API = "https://api.github.com/repos/jaimedhenriques/squadbots";
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 
 // GitHub's own "Star | count" button, as a pill. The count loads in the browser

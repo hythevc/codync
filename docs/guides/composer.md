@@ -32,7 +32,7 @@ SharedStore defaults with a separate map per computer. Signing out on iOS erases
 these values with the rest of the account data. Retired desktop/iOS stores cannot
 write late edits over a newly opened store.
 
-The terminal saves text under `CODYNC_HOME` (normally `~/.codync`), in a private,
+The terminal saves text under `SQUADBOTS_HOME` (normally `~/.squadbots`), in a private,
 atomically replaced `tui-drafts-<URL hash>.json` file for each host endpoint.
 Its existing send flow keeps a draft until delivery succeeds and preserves newer
 text if an earlier send finishes later. Save failures leave text in the session

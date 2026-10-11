@@ -80,9 +80,9 @@ jobs:
           # The host is built by `npm run dist:mac:main` (tools/native-host.mjs) for the same environment.
           # On-device speech for calls.
           swift build -c release --arch arm64 --arch x86_64 --package-path apps/desktop/native/speech-macos
-          cp "$(swift build -c release --arch arm64 --arch x86_64 --package-path apps/desktop/native/speech-macos --show-bin-path)/codync-speech" \
-            apps/desktop/build/native/codync-speech
-          # Codync Screen is built by `npm run dist:mac:main` (tools/native-screen.mjs).
+          cp "$(swift build -c release --arch arm64 --arch x86_64 --package-path apps/desktop/native/speech-macos --show-bin-path)/squadbots-speech" \
+            apps/desktop/build/native/squadbots-speech
+          # Squadbots Screen is built by `npm run dist:mac:main` (tools/native-screen.mjs).
           xcodebuild -downloadComponent MetalToolchain || true
           command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate --spec apps/project.yml
@@ -108,9 +108,9 @@ jobs:
           npm ci
           npm run icons
           npm run dist:mac:main -- --publish never
-          codesign -d --entitlements - dist/mac-universal/Codync.app | grep -q com.apple.security.device.audio-input ||
+          codesign -d --entitlements - dist/mac-universal/Squadbots.app | grep -q com.apple.security.device.audio-input ||
             { echo "audio-input entitlement missing"; exit 1; }
-          if [ "$NOTARIZE" = true ]; then spctl --assess --type execute -v dist/mac-universal/Codync.app; fi
+          if [ "$NOTARIZE" = true ]; then spctl --assess --type execute -v dist/mac-universal/Squadbots.app; fi
 
       - name: Update feeds
         env:
@@ -118,27 +118,27 @@ jobs:
         run: |
           VERSION=$(node -p 'require("./apps/desktop/package.json").version')
           # The iPhone app this release needs: Macs with iPhones wait until the App Store has it.
-          MIN_APP=$(apps/desktop/build/native/codync-host compat | python3 -c 'import json,sys; print(json.load(sys.stdin)["minApp"])')
+          MIN_APP=$(apps/desktop/build/native/squadbots-host compat | python3 -c 'import json,sys; print(json.load(sys.stdin)["minApp"])')
           printf 'minApp: %s\n' "$MIN_APP" >> apps/desktop/dist/latest-mac.yml
           # Installs of the earlier native app update through Sparkle: one more appcast, now for the zip.
           test -n "$SPARKLE_PRIVATE_KEY" || { echo 'SPARKLE_PRIVATE_KEY is required'; exit 1; }
           curl -sSL https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz | tar xJ -C "$RUNNER_TEMP"
-          mkdir -p build/updates && cp apps/desktop/dist/codync-macos.zip build/updates/
+          mkdir -p build/updates && cp apps/desktop/dist/squadbots-macos.zip build/updates/
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/bin/generate_appcast" --ed-key-file - --maximum-deltas 0 \
-            --download-url-prefix "https://github.com/leepokai/Codync/releases/download/v${VERSION}/" \
-            --link https://www.codync.dev/ -o build/appcast.xml build/updates
+            --download-url-prefix "https://github.com/jaimedhenriques/squadbots/releases/download/v${VERSION}/" \
+            --link https://www.squadbots.ai/ -o build/appcast.xml build/updates
           python3 packaging/updates/annotate-appcast.py build/appcast.xml "$MIN_APP"
           python3 -m venv "$RUNNER_TEMP/update-verification"
           "$RUNNER_TEMP/update-verification/bin/pip" install 'cryptography>=44,<47'
           "$RUNNER_TEMP/update-verification/bin/python" packaging/updates/verify-appcast.py \
-            build/appcast.xml apps/desktop/dist/mac-universal/Codync.app apps/desktop/dist/codync-macos.zip
+            build/appcast.xml apps/desktop/dist/mac-universal/Squadbots.app apps/desktop/dist/squadbots-macos.zip
 
       - uses: actions/upload-artifact@v4
         if: "!startsWith(github.ref, 'refs/tags/')"
         with:
-          name: codync-macos
+          name: squadbots-macos
           path: |
-            apps/desktop/dist/codync-macos.dmg
+            apps/desktop/dist/squadbots-macos.dmg
             apps/desktop/dist/latest-mac.yml
             build/appcast.xml
 
@@ -148,26 +148,26 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd apps/desktop/dist
-          shasum -a 256 codync-macos.dmg > codync-macos.dmg.sha256
-          FILES="codync-macos.dmg codync-macos.dmg.sha256 codync-macos.zip codync-macos.zip.blockmap latest-mac.yml ../../../build/appcast.xml"
+          shasum -a 256 squadbots-macos.dmg > squadbots-macos.dmg.sha256
+          FILES="squadbots-macos.dmg squadbots-macos.dmg.sha256 squadbots-macos.zip squadbots-macos.zip.blockmap latest-mac.yml ../../../build/appcast.xml"
           # The host workflow may have created this release already (same tag).
-          gh release create "$GITHUB_REF_NAME" $FILES --title "Codync $GITHUB_REF_NAME" --generate-notes ||
+          gh release create "$GITHUB_REF_NAME" $FILES --title "Squadbots $GITHUB_REF_NAME" --generate-notes ||
             gh release upload "$GITHUB_REF_NAME" $FILES --clobber
 
       - name: Update Homebrew tap
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          SHA=$(shasum -a 256 apps/desktop/dist/codync-macos.dmg | awk '{print $1}')
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
+          SHA=$(shasum -a 256 apps/desktop/dist/squadbots-macos.dmg | awk '{print $1}')
+          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/jaimedhenriques/homebrew-squadbots.git tap
           mkdir -p tap/Casks
-          sed -e "s/^  version .*/  version \"$VERSION\"/" -e "s/REPLACE_WITH_SHA256/$SHA/" packaging/homebrew/codync.rb > tap/Casks/codync.rb
+          sed -e "s/^  version .*/  version \"$VERSION\"/" -e "s/REPLACE_WITH_SHA256/$SHA/" packaging/homebrew/squadbots.rb > tap/Casks/squadbots.rb
           cp packaging/homebrew/README.md tap/
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Update Codync to $VERSION" || exit 0
+          git commit -m "Update Squadbots to $VERSION" || exit 0
           git push
 
   windows:
@@ -195,30 +195,30 @@ jobs:
           npm ci
           npm run dist:win:main -- --publish never
           cd dist
-          sha256sum codync-windows-x64.exe > codync-windows-x64.exe.sha256
+          sha256sum squadbots-windows-x64.exe > squadbots-windows-x64.exe.sha256
       - name: Smoke test the bundled host
         working-directory: apps/desktop/dist/win-unpacked/resources
         run: |
-          ./codync-host.exe --version
-          CODYNC_HOME="$RUNNER_TEMP/codync" ./codync-host.exe serve --port 19333 &
+          ./squadbots-host.exe --version
+          SQUADBOTS_HOME="$RUNNER_TEMP/squadbots" ./squadbots-host.exe serve --port 19333 &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:19333/health && break; sleep 1; done
           curl -sf http://127.0.0.1:19333/health | grep -q computerId
-          TOKEN=$(cat "$RUNNER_TEMP/codync/token")
+          TOKEN=$(cat "$RUNNER_TEMP/squadbots/token")
           curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:19333/api/refreshBackends
       - uses: actions/upload-artifact@v4
         if: "!startsWith(github.ref, 'refs/tags/')"
         with:
-          name: codync-windows-x64
+          name: squadbots-windows-x64
           path: |
-            apps/desktop/dist/codync-windows-x64.exe
+            apps/desktop/dist/squadbots-windows-x64.exe
             apps/desktop/dist/latest.yml
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            apps/desktop/dist/codync-windows-x64.exe
-            apps/desktop/dist/codync-windows-x64.exe.sha256
-            apps/desktop/dist/codync-windows-x64.exe.blockmap
+            apps/desktop/dist/squadbots-windows-x64.exe
+            apps/desktop/dist/squadbots-windows-x64.exe.sha256
+            apps/desktop/dist/squadbots-windows-x64.exe.blockmap
             apps/desktop/dist/latest.yml
 
   linux:
@@ -236,31 +236,31 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
-      # The Linux app uses the installed codync-host (codync-host-linux-*.tar.gz, host.yml).
+      # The Linux app uses the installed squadbots-host (squadbots-host-linux-*.tar.gz, host.yml).
       - run: sudo apt-get update && sudo apt-get install -y rpm
       - name: Build
         working-directory: apps/desktop
         run: |
           npm ci
           npm run dist:linux:main -- --${{ matrix.arch }} --publish never
-          # The website links releases/latest/download/codync-<os>-<arch>.tar.gz.
+          # The website links releases/latest/download/squadbots-<os>-<arch>.tar.gz.
           cd dist
           # electron-builder names x64 tar.gz `x64` and deb `amd64`; the update feed follows the renames.
-          for f in codync-linux-x64.* codync-linux-amd64.*; do
+          for f in squadbots-linux-x64.* squadbots-linux-amd64.*; do
             [ -e "$f" ] || continue
-            to="codync-${{ matrix.name }}.${f#*.}"
+            to="squadbots-${{ matrix.name }}.${f#*.}"
             mv "$f" "$to"
             sed -i "s|$f|$to|g" latest-linux*.yml
           done
-          for f in codync-${{ matrix.name }}.*; do shasum -a 256 "$f" > "$f.sha256"; done
+          for f in squadbots-${{ matrix.name }}.*; do shasum -a 256 "$f" > "$f.sha256"; done
       - uses: actions/upload-artifact@v4
         if: "!startsWith(github.ref, 'refs/tags/')"
         with:
-          name: codync-${{ matrix.name }}
-          path: apps/desktop/dist/codync-${{ matrix.name }}.*
+          name: squadbots-${{ matrix.name }}
+          path: apps/desktop/dist/squadbots-${{ matrix.name }}.*
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            apps/desktop/dist/codync-${{ matrix.name }}.*
+            apps/desktop/dist/squadbots-${{ matrix.name }}.*
             apps/desktop/dist/latest-linux*.yml

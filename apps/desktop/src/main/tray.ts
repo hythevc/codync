@@ -79,11 +79,11 @@ export class Tray {
     switch (state.kind) {
       case 'missingBinary':
         if (identity.environment === 'dev') {
-          items.push({ label: 'Rebuild Codync Dev with its development host.', enabled: false })
+          items.push({ label: 'Rebuild Squadbots Dev with its development host.', enabled: false })
           break
         }
-        items.push({ label: 'Reinstall Codync or install the host with Homebrew.', enabled: false })
-        items.push({ label: 'Copy host install command', click: () => clipboard.writeText('brew install leepokai/codync/codync-host') })
+        items.push({ label: 'Reinstall Squadbots or install the host with Homebrew.', enabled: false })
+        items.push({ label: 'Copy host install command', click: () => clipboard.writeText('brew install jaimedhenriques/squadbots/squadbots-host') })
         break
       case 'notInstalled':
         items.push({ label: 'Install host', click: () => void host.install() })

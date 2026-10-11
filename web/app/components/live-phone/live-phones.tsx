@@ -168,7 +168,7 @@ export default function LivePhones() {
     <MotionConfig reducedMotion="user">
       <motion.div {...enter(0.1, 40)} className="relative w-[58%]">
         <Phone>
-          <Screen label="Codync iPhone app demo: bot list">
+          <Screen label="Squadbots iPhone app demo: bot list">
             {/* Rows tapped here open their chat in the front phone. */}
             <Roster chats={chats} open={open(setFront)} />
             <StatusBar />
@@ -177,7 +177,7 @@ export default function LivePhones() {
       </motion.div>
       <motion.div {...enter(0.25, 60)} className="absolute top-[10%] right-0 z-10 w-[58%]">
         <Phone>
-          <Screen label="Codync iPhone app demo: chat">
+          <Screen label="Squadbots iPhone app demo: chat">
             {screen(front, setFront)}
             <StatusBar />
           </Screen>

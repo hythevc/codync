@@ -1,6 +1,6 @@
 # Running the host on a Linux server or cloud VM
 
-`codync-host` runs on any 64-bit Linux machine: a desktop, a home server, or a headless cloud VM (AWS, GCP, Azure, Hetzner, DigitalOcean…). It needs no display. Bots run on that machine and you message them from the iPhone, the desktop app or `codync-host tui`.
+`squadbots-host` runs on any 64-bit Linux machine: a desktop, a home server, or a headless cloud VM (AWS, GCP, Azure, Hetzner, DigitalOcean…). It needs no display. Bots run on that machine and you message them from the iPhone, the desktop app or `squadbots-host tui`.
 
 ## Requirements
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | x86_64 or arm64 Linux | Release builds exist for both architectures |
 | `ca-certificates` | HTTPS to the ACP registry, push relay and cloud. Every normal VM image has it; bare container images (`debian`, `ubuntu`) need `apt-get install ca-certificates`. Without it every command exits with `TLS setup failed: install the ca-certificates package` |
-| systemd | Only for `codync-host install` (background service). Without systemd, run `codync-host serve` under your own supervisor |
+| systemd | Only for `squadbots-host install` (background service). Without systemd, run `squadbots-host serve` under your own supervisor |
 | Node.js | Claude Code, Codex and Pi run through ACP adapters fetched with `npx` |
 | The agents you want, signed in | The host drives the CLIs installed on this machine with their own credentials. Sign in over SSH (`claude`, `codex login`…) as the same user that runs the host |
 
@@ -19,31 +19,31 @@ Distro and C library don't matter. From the first release built by the updated w
 Run as the user who owns the agents (not root, unless the agents are root's):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh -s -- --host-only
-# or: brew install leepokai/codync/codync-host
-codync-host install                    # systemd --user service, restarts on crash
+curl -fsSL https://raw.githubusercontent.com/jaimedhenriques/squadbots/main/packaging/install.sh | sh -s -- --host-only
+# or: brew install jaimedhenriques/squadbots/squadbots-host
+squadbots-host install                    # systemd --user service, restarts on crash
 sudo loginctl enable-linger "$USER"    # keep it running after you log out of SSH
-codync-host status
+squadbots-host status
 ```
 
-The script puts `codync-host` in `~/.local/bin` (`/usr/local/bin` as root; override with `CODYNC_BIN_DIR`), checks its SHA-256, and restarts the service on upgrade. `install` saves the current `PATH` into the service, so install Node and the agents first. If you add an agent later and the host doesn't find it, run `codync-host install` again. `install` needs a real login session (SSH login, not `sudo su user`), otherwise `systemctl --user` can't reach the user's service manager.
+The script puts `squadbots-host` in `~/.local/bin` (`/usr/local/bin` as root; override with `SQUADBOTS_BIN_DIR`), checks its SHA-256, and restarts the service on upgrade. `install` saves the current `PATH` into the service, so install Node and the agents first. If you add an agent later and the host doesn't find it, run `squadbots-host install` again. `install` needs a real login session (SSH login, not `sudo su user`), otherwise `systemctl --user` can't reach the user's service manager.
 
-Other commands work the same as on a desktop: `codync-host pair`, `codync-host tui`, `codync-host uninstall` (keeps data in `~/.codync`). Logs go to the journal: `journalctl --user -u codync-host -f`.
+Other commands work the same as on a desktop: `squadbots-host pair`, `squadbots-host tui`, `squadbots-host uninstall` (keeps data in `~/.squadbots`). Logs go to the journal: `journalctl --user -u squadbots-host -f`.
 
 ## Reaching it from the phone
 
 The phone connects over the encrypted device channel. The pairing link lists only **Tailscale** and **private (LAN/VPC)** addresses; the host never advertises a public IP.
 
-- **Tailscale (recommended for VMs):** install Tailscale on the VM and on the phone, then `codync-host pair`. The Tailscale name comes first in the link. You don't need to open port 19222 in the cloud firewall.
-- **Cloudflare cloud:** start the host with `CODYNC_CLOUD_URL=https://…` if you run your own Codync cloud. The production cloud isn't live yet (see [environments](environments-and-deployment.md)).
-- **Desktop app over SSH:** the desktop app (macOS or Linux) can attach an SSH computer and tunnel to its loopback API ([Accounts and SSH](accounts-and-ssh.md)). From any terminal: `ssh -L 19222:127.0.0.1:19222 vm`, then `codync-host tui` locally.
+- **Tailscale (recommended for VMs):** install Tailscale on the VM and on the phone, then `squadbots-host pair`. The Tailscale name comes first in the link. You don't need to open port 19222 in the cloud firewall.
+- **Cloudflare cloud:** start the host with `SQUADBOTS_CLOUD_URL=https://…` if you run your own Squadbots cloud. The production cloud isn't live yet (see [environments](environments-and-deployment.md)).
+- **Desktop app over SSH:** the desktop app (macOS or Linux) can attach an SSH computer and tunnel to its loopback API ([Accounts and SSH](accounts-and-ssh.md)). From any terminal: `ssh -L 19222:127.0.0.1:19222 vm`, then `squadbots-host tui` locally.
 
 The host listens on `0.0.0.0:19222`. The local API (`/api/*`, `/events`, terminals; bearer token) answers **loopback callers only**, so a public address never exposes it. From outside, only `/health` (host id, computer id, version) and the end-to-end encrypted device channel answer, and the channel only serves devices holding this host's pairing keys. Keep 19222 closed in the cloud firewall anyway unless you deliberately pair over a VPN or private network.
 
 ## Limitations on a headless server
 
 - **Remote screen and the `computer` tool don't work.** They need a desktop session (portals + GStreamer, `apps/screen-linux/`). The feature turns itself on only while a graphical session is running, so on a server it stays off and nothing else is affected.
-- **No desktop app.** The Linux desktop app (`codync`, AppImage/deb/tar.gz) needs a graphical session; it uses the installed `codync-host`. On a server, use the phone, the desktop app on another computer over SSH, or `codync-host tui`.
+- **No desktop app.** The Linux desktop app (`squadbots`, AppImage/deb/tar.gz) needs a graphical session; it uses the installed `squadbots-host`. On a server, use the phone, the desktop app on another computer over SSH, or `squadbots-host tui`.
 - **Keep-awake is a no-op.** The host tries `systemd-inhibit` while a bot works; VMs don't sleep, and failure only logs a warning.
 - **One computer per account.** A VM counts as the account's computer; multiple computers are future work.
 - **Usage limits** come from the local Claude and Codex installs, same as on a desktop.

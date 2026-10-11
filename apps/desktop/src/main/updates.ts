@@ -10,7 +10,7 @@ const { autoUpdater } = electronUpdater
 
 /**
  * The app's own updates (electron-updater, GitHub releases; packaged `main` builds only, so a
- * local `dev` build never replaces itself with a release). Codync
+ * local `dev` build never replaces itself with a release). Squadbots
  * coordinates its background services before the installer replaces the app: the host is
  * stopped first, and a restart marker makes the next launch reinstall it from the new bundle.
  */
@@ -144,7 +144,7 @@ export class Updates extends EventEmitter {
     }
     this.checked({ availableVersion: info.version, waitingForApp: waiting })
     if (waiting) {
-      if (this.userInitiated) this.set({ error: `Codync ${info.version} needs the iPhone app ${waiting}, which isn't in the App Store yet. It installs once that version passes review.` })
+      if (this.userInitiated) this.set({ error: `Squadbots ${info.version} needs the iPhone app ${waiting}, which isn't in the App Store yet. It installs once that version passes review.` })
       this.userInitiated = false
       return
     }

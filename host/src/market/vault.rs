@@ -12,8 +12,8 @@ use zeroize::Zeroizing;
 
 const PREFIX: &str = "vault:v1:";
 const SERVICE: &str = match crate::environment::Environment::current() {
-    crate::environment::Environment::Main => "dev.codync.credentials",
-    crate::environment::Environment::Dev => "dev.codync.development.credentials",
+    crate::environment::Environment::Main => "dev.squadbots.credentials",
+    crate::environment::Environment::Dev => "dev.squadbots.aielopment.credentials",
 };
 
 pub async fn unlock(hub: Arc<crate::hub::Hub>) -> Result<()> {

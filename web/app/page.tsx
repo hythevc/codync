@@ -30,7 +30,7 @@ export default function Home() {
         <Questions />
         <section className="px-4 pb-20 sm:px-6 md:pb-28">
           <Reveal className="mx-auto max-w-6xl">
-            <h2 className="mb-6 text-xl font-semibold text-neutral-50">Compare Codync</h2>
+            <h2 className="mb-6 text-xl font-semibold text-neutral-50">Compare Squadbots</h2>
             <CompareCards />
           </Reveal>
         </section>

@@ -22,7 +22,7 @@ def main():
     assert version == info["CFBundleVersion"], "appcast build version differs from app"
     assert enclosure.get("length") == str(archive.stat().st_size), "appcast archive size is wrong"
     assert len(base64.b64decode(enclosure.attrib[f"{{{namespace}}}edSignature"], validate=True)) == 64
-    expected = f"https://github.com/leepokai/Codync/releases/download/v{info['CFBundleShortVersionString']}/{archive.name}"
+    expected = f"https://github.com/jaimedhenriques/squadbots/releases/download/v{info['CFBundleShortVersionString']}/{archive.name}"
     assert enclosure.get("url") == expected, "appcast must point to this immutable release archive"
     public_key = Path(__file__).with_name("macos-public-key.txt").read_text().strip()
     Ed25519PublicKey.from_public_bytes(base64.b64decode(public_key, validate=True)).verify(
@@ -30,8 +30,8 @@ def main():
         archive.read_bytes(),
     )
     assert info["SUPublicEDKey"] == public_key, "app has the wrong Sparkle public key"
-    min_app = item.findtext("{https://codync.dev/xml-namespaces/appcast}minApp")
-    assert min_app and all(part.isdigit() for part in min_app.split(".")), "appcast needs codync:minApp"
+    min_app = item.findtext("{https://squadbots.ai/xml-namespaces/appcast}minApp")
+    assert min_app and all(part.isdigit() for part in min_app.split(".")), "appcast needs squadbots:minApp"
     print("Sparkle appcast matches the signed app and release archive")
 
 

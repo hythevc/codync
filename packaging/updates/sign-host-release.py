@@ -27,7 +27,7 @@ def main():
     version = args.version.removeprefix("v")
     if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version):
         parser.error("version must be a stable major.minor.patch release")
-    name = f"codync-host-{args.platform}.tar.gz"
+    name = f"squadbots-host-{args.platform}.tar.gz"
     if args.archive.name != name:
         parser.error(f"expected archive name {name}")
     key = Ed25519PrivateKey.from_private_bytes(base64.b64decode(os.environ["HOST_UPDATE_SIGNING_KEY"].strip(), validate=True))
@@ -39,12 +39,12 @@ def main():
     manifest = {
         "version": version,
         "platform": args.platform,
-        "url": f"https://github.com/leepokai/Codync/releases/download/v{version}/{name}",
+        "url": f"https://github.com/jaimedhenriques/squadbots/releases/download/v{version}/{name}",
         "sha256": hashlib.sha256(archive).hexdigest(),
         "size": len(archive),
     }
     data = (json.dumps(manifest, indent=2) + "\n").encode()
-    output = args.archive.with_name(f"codync-host-{args.platform}.update.json")
+    output = args.archive.with_name(f"squadbots-host-{args.platform}.update.json")
     output.write_bytes(data)
     output.with_suffix(output.suffix + ".sig").write_text(base64.b64encode(key.sign(data)).decode() + "\n")
     print(f"Signed {output.name}")
@@ -53,7 +53,7 @@ def main():
     if not min_app:
         raise SystemExit("MIN_APP not found in host/src/compat.rs")
     data = (json.dumps({"version": version, "minApp": min_app[1]}, indent=2) + "\n").encode()
-    output = args.archive.with_name(f"codync-host-{args.platform}.compat.json")
+    output = args.archive.with_name(f"squadbots-host-{args.platform}.compat.json")
     output.write_bytes(data)
     output.with_suffix(output.suffix + ".sig").write_text(base64.b64encode(key.sign(data)).decode() + "\n")
     print(f"Signed {output.name}")

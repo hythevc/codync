@@ -5,7 +5,7 @@ import { app, ipcMain, safeStorage } from 'electron'
 import type { AccountService } from './account'
 
 /**
- * The Codync cloud's user-facing `/v1` API (§8.4) with this install's device key (§3.2): an
+ * The Squadbots cloud's user-facing `/v1` API (§8.4) with this install's device key (§3.2): an
  * Ed25519 key per account, kept encrypted with the OS keychain, that signs `Codync-Sig` (§5).
  */
 
@@ -91,7 +91,7 @@ export function registerCloud(account: AccountService) {
       }
       return { ok: true, value: json }
     } catch {
-      return { ok: false, error: { status: 0, code: 'unreachable', message: "Can't reach the Codync cloud. Check your connection." } }
+      return { ok: false, error: { status: 0, code: 'unreachable', message: "Can't reach the Squadbots cloud. Check your connection." } }
     }
   })
   ipcMain.handle('cloud:deviceKey', async () => (account.state.user ? (await identity(account.state.user.userId)).publicKey : null))

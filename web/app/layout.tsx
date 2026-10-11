@@ -17,11 +17,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Codync: the open-source Grok Bot alternative, a free AI agent app",
-    template: "%s | Codync",
+    default: "Squadbots: the open-source Grok Bot alternative, a free AI agent app",
+    template: "%s | Squadbots",
   },
   description: DESCRIPTION,
-  applicationName: "Codync",
+  applicationName: "Squadbots",
   keywords: [
     "Grok Bot alternative",
     "Muse alternative",
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     "free",
   ],
   metadataBase: new URL(SITE),
-  openGraph: { type: "website", siteName: "Codync", locale: "en_US" },
+  openGraph: { type: "website", siteName: "Squadbots", locale: "en_US" },
   twitter: { card: "summary_large_image" },
   appLinks: { ios: { url: APP_STORE, app_store_id: "6760984418" } },
   itunes: { appId: "6760984418" },
