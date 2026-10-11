@@ -41,6 +41,13 @@ vector. That is a protocol revision with regenerated vectors
 (`docs/reference/fixtures/remote-relay-vectors.py`) and a `minApp`/`minHost` bump, and it is not
 this change. The vectors file and its generator are untouched.
 
+Anything the vectors pin has to stay spelled their way, in whatever case the caller uses, or the
+comparison fails: `host/src/remote/relay.rs` looks the header up as lowercase `codync-sig`, and
+`RelayVectorsTests.requestSignature` passes the vectors' authority in mixed case
+(`Codync-Cloud-Staging.example.workers.dev`) precisely to prove the canonicalizer lowercases it.
+Both bit this rename once. When the protocol rename does happen, sweep every case variant, not
+just the one the labels are written in.
+
 **The 18 widget TTFs.** `apps/ios/Widgets/Resources/Fonts/CodyncBot-*.ttf` and `CodyncOrb-*.ttf`
 are loaded by PostScript name (`TimerFrames(font: "CodyncBot-\(shape)-Ink")`), and that name lives
 inside the binary. Renaming the files without rebuilding them would break the animated Live

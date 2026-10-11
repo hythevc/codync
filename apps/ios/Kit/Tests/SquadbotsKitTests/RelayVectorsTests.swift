@@ -196,7 +196,7 @@ private func raw(_ key: SymmetricKey) -> Data { key.withUnsafeBytes { Data($0) }
 }
 
 @Test func requestSignature() throws {
-    let input = RelayCrypto.requestSigInput(method: "get", authority: "Squadbots-Cloud-Staging.example.workers.dev",
+    let input = RelayCrypto.requestSigInput(method: "get", authority: "Codync-Cloud-Staging.example.workers.dev",
                                             pathAndQuery: v.str("requestSig", "pathAndQuery"), ts: 1_790_000_000_000,
                                             nonce: v.str("requestSig", "nonce"), body: Data())
     #expect(input == Data(v.str("requestSig", "canonical").utf8))
@@ -211,7 +211,7 @@ private func raw(_ key: SymmetricKey) -> Data { key.withUnsafeBytes { Data($0) }
     let sig = try #require(Data(base64URL: header.components(separatedBy: ",sig=")[1]))
     #expect(v.deviceSign.publicKey.isValidSignature(sig, for: input))
 
-    let url = try #require(URL(string: "https://Squadbots-Cloud-Staging.example.workers.dev/v1/relay/device/NHUPmL1Z_PyUbaRaqr6TOw?v=1"))
+    let url = try #require(URL(string: "https://Codync-Cloud-Staging.example.workers.dev/v1/relay/device/NHUPmL1Z_PyUbaRaqr6TOw?v=1"))
     #expect(RelayCrypto.authority(of: url) == v.str("requestSig", "authority"))
     #expect(RelayCrypto.pathAndQuery(of: url) == v.str("requestSig", "pathAndQuery"))
     #expect(RelayCrypto.authority(of: URL(string: "http://127.0.0.1:8787/v1")!) == "127.0.0.1:8787")

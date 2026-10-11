@@ -43,6 +43,10 @@ submission, no cloud deployment, and the Apple team/signing/App Store identifier
   Renaming them is a protocol revision, not a rebrand.
 - 2026-10-11 Held the `CodyncBot-*` / `CodyncOrb-*` TTFs out: the font name is inside the binary and
   the widgets load by PostScript name.
+- 2026-10-11 The hold-back list has to cover every *case variant* of what the relay vectors pin, not
+  just the spelling the labels use. Missing that broke the host's lowercase `codync-sig` header
+  lookup and the Swift `requestSignature` test's mixed-case authority. Both fixed; CI caught the
+  second one.
 - 2026-10-11 No version bump with the rename — a bump on `main` fires `auto-tag.yml`, which
   publishes.
 - 2026-10-11 `apps/desktop` `src/shared/ssh-command.test.ts` fails 7 of 21 in the cloud sandbox on
