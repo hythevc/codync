@@ -1,0 +1,3 @@
+timestamp	phase	decision	reason	evidence	result
+2026-10-11 10:33 UTC+1	requirements gate	Q1: first candidate = desktop (macOS + Windows), iPhone second, terminal later; native proof per chosen platform, no Linux-only claims.	Owner answer	docs/gate-questions.md#answers	RECORDED; native proof remains required
+2026-10-11 10:33 UTC+1	requirements gate	Q2-Q12: lane recommendations APPROVED AS WRITTEN.	Owner answer	docs/gate-questions.md#answers; docs/gate-questions.md questions 2-12	RECORDED; no execution or merge authorization added
