@@ -21,6 +21,8 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    outputs:
+      signing: ${{ steps.signing.outputs.available }}
     defaults:
       run:
         working-directory: apps/desktop
@@ -41,9 +43,26 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Signing secrets are available
+        id: signing
+        # A job-level `if:` sees only github, needs, vars and inputs — never secrets — so the macos
+        # gate has to arrive as a `needs` output. Keep this env on this step alone.
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE_P12" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No APPLE_CERTIFICATE_P12: the macos job will be skipped (forks have no signing secrets)."
+          fi
 
   macos:
     needs: check
+    # Without the certificate this job dies in `security import` a second in, before it compiles
+    # anything. A tag is exempt: a rotated-out certificate must still go red there, and Publish
+    # and Update Homebrew tap are steps of this job.
+    if: needs.check.outputs.signing == 'true' || startsWith(github.ref, 'refs/tags/')
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
