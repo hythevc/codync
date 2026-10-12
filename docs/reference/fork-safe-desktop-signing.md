@@ -176,14 +176,33 @@ either way.
 `npm run build`, so a fork waits for install, typecheck, test and build before learning that
 `macos` will be skipped. Harmless, but the step is a two-second string test and could sit first.
 
-### Not verified
+### Observed
 
-The macOS job itself was never executed — there is no macOS runner, Swift toolchain or Xcode in the
-environment this analysis ran in, and no run of #5's `macos` job has completed. Every statement
-above is from reading the workflow, the builder config and the packaging scripts, plus the API for
-the `needs` graph and branch protection. **"It compiles" is not evidence and neither is this.** The
-proof is a `Release desktop` run on #5's head showing `macos` skipped on a fork and `check`,
-`windows` and `linux` still green, with a same-repo-secret run showing `macos` unchanged.
+The fork half of the proof landed while this was being written. `Release desktop` on #5's head
+`23f7ee11`, in this secretless fork:
+
+```
+check                                         success
+macos                                         skipped
+linux (ubuntu-24.04, x64, linux-x86_64)       success
+linux (ubuntu-24.04-arm, arm64, linux-arm64)  success
+windows                                       still running at the time of writing
+```
+
+`macos` skipped rather than failing, and the no-cascade finding confirmed empirically: both `linux`
+jobs went green with `macos` skipped. That is the predicted outcome measured rather than reasoned.
+
+### Still not verified
+
+The **signed** path. This fork holds no Apple secrets at all, so no run here can exercise the
+`signing == 'true'` arm, and the claim that the twelve `macos` steps behave identically when the
+certificate is present rests entirely on reading the diff. That half needs a run where
+`APPLE_CERTIFICATE_P12` is set — upstream, or this fork once it has its own certificate.
+
+The macOS job body was never executed either: there is no macOS runner, Swift toolchain or Xcode in
+the environment this analysis ran in, and a skipped job runs none of its steps. So nothing here
+says the mac build itself still works — only that the gate fires as intended. **"It compiles" is
+not evidence, and neither is a skipped job.**
 
 This note is a maker's analysis, not an ACCEPT. #5 still needs an independent verdict from a
 different model family, pinned to one commit, per the standing verification rule.
