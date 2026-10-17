@@ -178,19 +178,22 @@ either way.
 
 ### Observed
 
-The fork half of the proof landed while this was being written. `Release desktop` on #5's head
-`23f7ee11`, in this secretless fork:
+The fork half of the proof. `Release desktop` on #5's head `23f7ee11`, in this secretless fork,
+completed 2026-10-12 between 10:25 and 10:35 UTC:
 
 ```
-check                                         success
-macos                                         skipped
-linux (ubuntu-24.04, x64, linux-x86_64)       success
-linux (ubuntu-24.04-arm, arm64, linux-arm64)  success
-windows                                       still running at the time of writing
+check                                         success   10:25:13
+macos                                         skipped   10:25:14
+linux (ubuntu-24.04-arm, arm64, linux-arm64)  success   10:28:13
+linux (ubuntu-24.04, x64, linux-x86_64)       success   10:28:36
+windows                                       success   10:35:18
 ```
 
-`macos` skipped rather than failing, and the no-cascade finding confirmed empirically: both `linux`
-jobs went green with `macos` skipped. That is the predicted outcome measured rather than reasoned.
+`macos` skipped rather than failing, and the no-cascade finding held empirically: `windows` and both
+`linux` jobs went green with `macos` skipped. That is the predicted outcome measured rather than
+reasoned. `macos` resolved one second after `check` finished, so the skip itself cost nothing.
+`check` ran 31 seconds, 10:24:42 to 10:25:13, and the gate output existed only at its end — which
+puts a number on the latency finding above: real, and about half a minute.
 
 ### Still not verified
 
