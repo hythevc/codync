@@ -17,13 +17,13 @@ different name and icon — which is why the rename exists.
 | Client | Component | Declared | Verdict |
 |---|---|---|---|
 | host | `host/Cargo.toml` | `license = "Apache-2.0"` | **keep** |
-| host (Linux screen helper) | `apps/screen-linux/Cargo.toml` | `license = "Apache-2.0"` | **keep** |
+| Linux screen helper | `apps/screen-linux/Cargo.toml` | `license = "Apache-2.0"` | **keep** |
 | desktop | `apps/desktop/package.json` | `"license": "UNLICENSED"`, `"private": true` | **keep** — but relabel, see below |
 | iOS | `apps/ios/Kit/Package.swift` | none — SwiftPM has no licence field | **keep**, governed by the root `LICENSE` |
 | macOS screen helper | `apps/screen-macos` | none | **keep**, governed by the root `LICENSE` |
 | web | `web/package.json` | no `license` field, `"private": true` | **keep** — relabel |
-| host cloud | `cloud/package.json` | `"license": "Apache-2.0"`, private | **keep** |
-| host push relay | `relay/package.json` | `"license": "Apache-2.0"`, private | **keep** |
+| cloud (accounts, relay) | `cloud/package.json` | `"license": "Apache-2.0"`, private | **keep** |
+| push relay | `relay/package.json` | `"license": "Apache-2.0"`, private | **keep** |
 | marketing | `marketing/app-store-screenshots/package.json` | no `license` field, private | **keep** — relabel |
 | vendored | `packaging/cua-driver/` | MIT, © 2025 Cua AI, Inc., `packaging/cua-driver/LICENSE` | **keep** — notice ships on Windows only, see gap 3 |
 | vendored | thinking-orbs geometry | MIT, © 2026 Jakub Antalik, bundled notice | **keep**, notice already present |
@@ -86,9 +86,12 @@ rather than introduced by the rename, and the clearest legal defect found.
 
 Narrower and sharper: the Windows build ships `cua-driver.LICENSE` (107–108), and so does the dev
 config (`electron-builder.dev.yml:42`), but the **macOS** build does not — while still bundling the
-driver itself, inside `CodyncScreen.app` (`:63` ships the app, and `signIgnore` at `:46` names
+driver itself, inside `CodyncScreen.app` (`:63` ships the app, `signIgnore` at `:45–46` names
 `CodyncScreen.app/Contents/Helpers/cua-driver`). The driver is MIT, © 2025 Cua AI, Inc., and MIT
-requires its notice to accompany the distribution. Windows complies; macOS does not.
+requires its notice to accompany the distribution. Windows complies; macOS does not; Linux is
+unaffected because its build bundles no `cua-driver` at all — the `linux:` block (`:78` onward)
+ships none. The file's own header comment says as much at `:6`: the macOS screen helper is built
+"with cua-driver inside".
 
 **Done-when:** `LICENSE` and `NOTICE` are in the packaged app on all three platforms and
 `cua-driver.LICENSE` ships wherever `cua-driver` does, each asserted by a test over the built
@@ -102,7 +105,8 @@ distribution of the work, but it is where a reader looks first.
 footer, with a test asserting byte-equality against the repository root so they cannot drift.
 
 Not a gap: **zero per-file copyright headers** across `.rs`, `.swift`, `.ts` and `.tsx`. Apache
-2.0's appendix recommends them; it does not require them. Adding 600 headers would be churn.
+2.0's appendix recommends them; it does not require them. Adding them to all 652 source files would
+be churn.
 
 ## The parity gate
 
@@ -115,7 +119,7 @@ The shipped clients, with what each is:
 | | lines | surfaces present |
 |---|---|---|
 | host (`host/`) | 46,069 | the API, the agent actors, and the terminal UI: roster, chat, transcript, trace, routines, marketplace, memory, computer access, usage, pairing, permissions, help |
-| iOS (`apps/ios`) | 38,810 | Bots, Thread, Call, Marketplace, Routines, Screen, Usage, Store |
+| iOS (`apps/ios`) | 38,810 | Bots, Thread, Call, Marketplace, Routines, Screen, Usage |
 | desktop (`apps/desktop`) | 32,354 | BotRoster, Thread, call, marketplace, routines, computer-access, usage, settings, PairingWindow, SearchPalette, StartupRecovery, tray |
 | web (`web/`) | 21,831 | marketing site only — not a product client |
 | cloud (`cloud/`) + relay (`relay/`) | 8,779 + 1,968 | accounts, relay, push — infrastructure, no UI |
