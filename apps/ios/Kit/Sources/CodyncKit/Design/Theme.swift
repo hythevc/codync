@@ -1,9 +1,7 @@
 import SwiftUI
 
 import UIKit
-private typealias PlatformColor = UIColor
-
-private extension PlatformColor {
+private extension UIColor {
     convenience init(hex: UInt32, alpha: CGFloat = 1) {
         self.init(
             red: CGFloat((hex >> 16) & 0xFF) / 255,
@@ -109,6 +107,12 @@ public enum RelativeTime {
             : cal.isDateInYesterday(date) ? String(localized: "Yesterday")
             : date.formatted(.dateTime.month(.abbreviated).day())
         return day + " " + date.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// A time to come: 3:00 PM today, otherwise Tue 3:00 PM.
+    public static func clock(_ date: Date, now: Date = .now) -> String {
+        let time = date.formatted(date: .omitted, time: .shortened)
+        return Calendar.current.isDate(date, inSameDayAs: now) ? time : "\(date.formatted(.dateTime.weekday(.abbreviated))) \(time)"
     }
 
     public static func until(_ date: Date, now: Date = .now) -> String {

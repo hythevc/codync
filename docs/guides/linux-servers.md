@@ -9,7 +9,7 @@
 | x86_64 or arm64 Linux | Release builds exist for both architectures |
 | `ca-certificates` | HTTPS to the ACP registry, push relay and cloud. Every normal VM image has it; bare container images (`debian`, `ubuntu`) need `apt-get install ca-certificates`. Without it every command exits with `TLS setup failed: install the ca-certificates package` |
 | systemd | Only for `codync-host install` (background service). Without systemd, run `codync-host serve` under your own supervisor |
-| Node.js | Claude Code, Codex and Pi run through ACP adapters fetched with `npx` |
+| Node.js (optional) | Claude Code, Codex and Pi run through ACP adapters fetched with `npx`. Without Node, an agent's setup offers to add Codync's own copy (glibc distros; over SSH: `codync-host node`); on musl distros (Alpine) install Node.js |
 | The agents you want, signed in | The host drives the CLIs installed on this machine with their own credentials. Sign in over SSH (`claude`, `codex login`…) as the same user that runs the host |
 
 Distro and C library don't matter. From the first release built by the updated workflow, Linux release binaries are static musl builds with no glibc dependency. Earlier releases (≤ 2.1.0) were built against glibc 2.39 and only start on Ubuntu 24.04 or newer. On older distros they fail with `GLIBC_2.39 not found`; build from source or use a newer release there.
@@ -32,10 +32,11 @@ Other commands work the same as on a desktop: `codync-host pair`, `codync-host t
 
 ## Reaching it from the phone
 
-The phone connects over the encrypted device channel. The pairing link lists only **Tailscale** and **private (LAN/VPC)** addresses; the host never advertises a public IP.
+The phone connects over the encrypted device channel. The pairing link lists only **Tailscale** and **private (LAN/VPC)** addresses, plus any you set in `CODYNC_EXTERNAL_URL`; the host never advertises a public IP on its own.
 
 - **Tailscale (recommended for VMs):** install Tailscale on the VM and on the phone, then `codync-host pair`. The Tailscale name comes first in the link. You don't need to open port 19222 in the cloud firewall.
 - **Cloudflare cloud:** start the host with `CODYNC_CLOUD_URL=https://…` if you run your own Codync cloud. The production cloud isn't live yet (see [environments](environments-and-deployment.md)).
+- **Your own HTTPS reverse proxy:** forward only `/channel` (WebSocket upgrade) at the root of a hostname to the host; don't forward `/api`, `/events`, `/term` or `/oauth`: through a local proxy every request looks like it comes from this computer, so the loopback-only checks no longer protect them. Then set `CODYNC_EXTERNAL_URL=https://codync.example.com` (comma-separated for several) in the host's environment: `systemctl --user edit codync-host`, add `[Service]` and `Environment=CODYNC_EXTERNAL_URL=https://codync.example.com`, then `systemctl --user restart codync-host`. The host advertises those URLs first, in the pairing link and on every connection, so the phone keeps them (a phone keeps only the addresses the host advertises). Under your own supervisor, `CODYNC_EXTERNAL_URL=… codync-host serve --bind 127.0.0.1` keeps the host on loopback behind the proxy.
 - **Desktop app over SSH:** the desktop app (macOS or Linux) can attach an SSH computer and tunnel to its loopback API ([Accounts and SSH](accounts-and-ssh.md)). From any terminal: `ssh -L 19222:127.0.0.1:19222 vm`, then `codync-host tui` locally.
 
 The host listens on `0.0.0.0:19222`. The local API (`/api/*`, `/events`, terminals; bearer token) answers **loopback callers only**, so a public address never exposes it. From outside, only `/health` (host id, computer id, version) and the end-to-end encrypted device channel answer, and the channel only serves devices holding this host's pairing keys. Keep 19222 closed in the cloud firewall anyway unless you deliberately pair over a VPN or private network.

@@ -13,6 +13,8 @@ struct BotTemplateView: View {
         template.id = nil
         template.pinned = nil
         template.hidden = nil
+        template.fallbacks = nil
+        template.selfFallbacks = nil
         self.template = template
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -56,7 +58,6 @@ struct BotTemplateView: View {
         }
         .padding([.horizontal, .bottom], 24)
         }
-        .frame(width: 560, height: 540)
         .background(Palette.background)
     }
 }

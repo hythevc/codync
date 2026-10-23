@@ -2,7 +2,7 @@ import CodyncKit
 import SwiftUI
 import UIKit
 
-// Codync's own screen chrome: modals, headers, icon buttons and the iPhone tab bar.
+// Codync's own screen chrome: modals, headers and icon buttons.
 // Present with `.codyncSheet`, title with `ModalHeader` / `ScreenHeader`.
 // The iPhone bot list and conversation use the native navigation toolbar for Liquid Glass.
 // Every transition animates (Motion.layout / Motion.fade), honoring Reduce Motion.
@@ -13,40 +13,33 @@ import UIKit
 public struct IconButton: View {
     let title: String
     let systemImage: String
-    var selected: Bool
     let action: () -> Void
 
-    public init(_ title: String, systemImage: String, selected: Bool = false, action: @escaping () -> Void) {
+    public init(_ title: String, systemImage: String, action: @escaping () -> Void) {
         self.title = title
         self.systemImage = systemImage
-        self.selected = selected
         self.action = action
     }
 
     public var body: some View {
         Button(title, systemImage: systemImage, action: action)
             .labelStyle(.iconOnly)
-            .buttonStyle(IconButtonStyle(selected: selected))
+            .buttonStyle(IconButtonStyle())
             .help(title)
     }
 }
 
 public struct IconButtonStyle: ButtonStyle {
-    var selected: Bool
-    var size: CGFloat
+    private let size: CGFloat = 36
 
-    public init(selected: Bool = false, size: CGFloat? = nil) {
-        self.selected = selected
-        self.size = size ?? 36
-    }
+    public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
-        IconButtonBody(configuration: configuration, selected: selected, size: size)
+        IconButtonBody(configuration: configuration, size: size)
     }
 
     private struct IconButtonBody: View {
         let configuration: Configuration
-        let selected: Bool
         let size: CGFloat
         @State private var hovering = false
         @Environment(\.isEnabled) private var isEnabled
@@ -54,17 +47,16 @@ public struct IconButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.system(size: size / 2, weight: .medium))
-                .foregroundStyle(selected ? Palette.onAccent : hovering ? Palette.text : Palette.secondary)
+                .foregroundStyle(hovering ? Palette.text : Palette.secondary)
                 .frame(width: size, height: size)
                 .background(
-                    selected ? Palette.accentFill : Palette.text.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0),
+                    Palette.text.opacity(configuration.isPressed ? 0.14 : hovering ? 0.08 : 0),
                     in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
                 )
                 .opacity(isEnabled ? 1 : 0.35)
                 .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)
                 .animation(Motion.press, value: configuration.isPressed)
                 .animation(Motion.hover, value: hovering)
-                .animation(Motion.hover, value: selected)
                 .contentShape(Rectangle())
                 .onHover { hovering = $0 }
         }
@@ -180,7 +172,7 @@ public extension View {
         modifier(CodyncItemSheet(item: item, sheet: content))
     }
 
-    /// Presents a full-window layer the content draws itself (menus, dialogs), fading in and out.
+    /// Presents a full-window layer the content draws itself (dialogs, the remote screen), fading in and out.
     /// `close` animates it away.
     func codyncOverlay<Layer: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping (_ close: @escaping () -> Void) -> Layer) -> some View {
         modifier(CodyncOverlay(isPresented: isPresented, layer: content))
@@ -285,48 +277,5 @@ public extension View {
     func hidesSystemNavigationBar() -> some View {
         toolbar(.hidden, for: .navigationBar)
             .background(SwipeBackEnabler().frame(width: 0, height: 0))
-    }
-}
-
-// MARK: - Tab bar
-
-/// The iPhone's bottom bar (replaces `TabView`): a floating capsule of icon tabs.
-public struct TabBar<ID: Hashable>: View {
-    @Binding var selection: ID
-    let tabs: [(id: ID, title: String, icon: String)]
-    @Namespace private var thumb
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    public init(selection: Binding<ID>, tabs: [(id: ID, title: String, icon: String)]) {
-        _selection = selection
-        self.tabs = tabs
-    }
-
-    public var body: some View {
-        HStack(spacing: 4) {
-            ForEach(tabs, id: \.id) { tab in
-                let on = tab.id == selection
-                Button {
-                    withAnimation(Motion.reduced(Motion.morph, reduceMotion)) { selection = tab.id }
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: tab.icon).font(.system(size: 18, weight: .medium))
-                        Text(tab.title).font(.caption2.weight(.medium))
-                    }
-                    .foregroundStyle(on ? Palette.text : Palette.secondary)
-                    .frame(width: 76, height: 50)
-                    .background {
-                        if on {
-                            Capsule().fill(Palette.text.opacity(0.08)).matchedGeometryEffect(id: "tab", in: thumb)
-                        }
-                    }
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(PressScale())
-                .accessibilityAddTraits(on ? .isSelected : [])
-            }
-        }
-        .padding(5)
-        .glass(in: Capsule())
     }
 }

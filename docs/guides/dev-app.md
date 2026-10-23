@@ -15,9 +15,22 @@ Desktop development and builds on macOS generate SF Symbols automatically, inclu
 | Desktop packaging | `npm run dist:<platform>:main` | `npm run dist:<platform>:dev` |
 | Foreground host | `CODYNC_ENV=main cargo run -- serve` | `cargo run -- serve` |
 
-`<platform>` is `mac`, `linux`, or `win`. Desktop `npm run dev` uses the development identity. An unpackaged run needs a matching development host binary (`host/target/debug/codync-host`, or `CODYNC_HOST_BIN`). On Linux, install a development host as `~/.local/bin/codync-dev-host`; the production binary remains `codync-host`.
+`<platform>` is `mac`, `linux`, or `win`. Desktop `npm run dev` uses the development identity; in a linked worktree it runs a [sandbox](#worktree-sandboxes). In the main checkout, an unpackaged run needs a matching development host binary; it takes the first that exists of `CODYNC_HOST_BIN`, `apps/desktop/build/native/codync-host` (left by `dist:mac:dev`, or rebuilt alone with `node tools/native-host.mjs dev`) and `host/target/debug/codync-host`, so after a `dist:mac:dev` a plain `cargo build` isn't picked up. On Linux, install a development host as `~/.local/bin/codync-dev-host`; the production binary remains `codync-host`.
 
 Xcode configurations separate environment from optimization: `Debug` and `Release` use production; `DevDebug` and `DevRelease` use development. The `iOS` archive remains `Release`, preserving Xcode Cloud's existing production scheme. Configure schemes through `apps/project.yml`, then regenerate with `xcodegen generate --spec apps/project.yml`.
+
+## Worktree sandboxes
+
+`npm run dev` decides by checkout. The main checkout (its `.git` is a folder) runs the default Codync Dev: the launchd/systemd host on 19223 and `~/.codync-dev`, the one a physical iPhone pairs with. A linked worktree (its `.git` is a file) runs a sandbox beside it, so any number of worktrees and agents test at once:
+
+- Host data in `~/.codync-dev-<worktree folder>`, which also holds the app's session, account and single-instance lock (`desktop/`). The window and menu bar read `Codync Dev (<name>)`.
+- A port from 19300–19399, picked free on the first run and kept in that folder's `sandbox.json`, so a paired simulator stays paired.
+- A host built from the worktree's own code (`node tools/native-host.mjs dev`; on Linux `cargo build`, honoring `CARGO_TARGET_DIR`; or `CODYNC_HOST_BIN`), started and stopped with the app, logging to `host.log`. No launchd/systemd service, and the dev cloud is off.
+- The run prints the commands that pair a phone or simulator (`codync-host pair`) and open the terminal UI against the sandbox. Give each sandbox its own simulator: a simulator holds one Codync Dev.
+
+Flags go after `npm run dev --`: `--shared` takes the default Codync Dev from a worktree (quit the main checkout's first); `--sandbox` runs a sandbox from the main checkout, for a second session on `dev`; `--name <name>` runs the sandbox of that name, for another copy of the same checkout; `--cloud` lets the sandbox host use the dev cloud (each sandbox then shows as another computer); `--cdp` opens the DevTools protocol on the sandbox port + 10000; `--list` shows every sandbox; `--prune` deletes the ones whose worktree is gone, so run it after removing worktrees.
+
+Still shared: macOS sees every unpackaged run as the same Electron app, so permissions and notifications are shared and a `codync-dev://` sign-in callback may reach another copy (test sign-in on the default Codync Dev); Codync Screen and computer use need the packaged `Codync Dev.app`; a global shortcut (the approval island's) goes to whichever app registered it first.
 
 ## Resource ownership
 
@@ -28,6 +41,7 @@ Xcode configurations separate environment from optimization: `Debug` and `Releas
 | iOS App Group | `group.com.pokai.Codync` | `group.com.pokai.Codync.dev` |
 | iOS Keychain group (team prefix omitted) | `com.pokai.Codync` | `com.pokai.Codync.dev` |
 | Desktop bundle | `com.pokai.Codync` | `com.pokai.Codync.dev` |
+| Android application ID | `com.pokai.Codync.android` | `com.pokai.Codync.android.dev` |
 | Linux package / Windows package cache | `codync-desktop` | `codync-desktop-dev` |
 | Desktop account callback | `com.pokai.Codync://callback` | `com.pokai.Codync.dev://callback` |
 | Pairing and widget links | `codync://` | `codync-dev://` |
@@ -49,6 +63,8 @@ Stop only the variant being replaced. Avoid `pkill codync-host`, generic bundle 
 
 Register the development app identifiers, App Group and Sign in with Apple capability with the signing team. Configure the Clerk development instance to accept the new iOS identifier and desktop callback. These settings are external to the repository; a successful simulator build does not prove signing or sign-in works on a device.
 
+Since 2026-10-10 the Clerk development instance lists `7FUM8A8H72.com.pokai.Codync.ios.dev` and `7FUM8A8H72.com.pokai.Codync.dev` under Native applications, with their `://callback` redirects. Without the iOS entry, Clerk rejects the Dev app's native Apple token: the log shows `sign_up.failed` with "You are not authorized to perform this request", and the app shows only "Couldn't sign in". Check the instance's Logs page first when sign-in fails.
+
 The cloud adds `/v1/oauth/callback/dev` for connector sign-in, returning `codync-dev://oauth`. The existing callback keeps returning `codync://oauth`. Deploy the added route to the development Worker before testing connector sign-in from a Dev client.
 
 The push relay seals the app bundle identifier into new tickets and selects that APNs topic. Existing tickets and registrations without a bundle identifier retain the production topic. Only the production and Dev iOS identifiers are accepted; alert and Live Activity destinations stay separate. Deploy this additive relay change before testing Dev notifications. APNs sandbox/production is a signing/distribution choice, independent of which Codync cloud is used.
@@ -65,6 +81,8 @@ Before resetting keys or pairing again:
 4. Refresh the account list. Working SSH or local access does not prove the clouds match.
 
 An environment change is not a migration of the production account or host. The fresh Dev instance starts without production bots or permissions.
+
+A local build from before the Dev split (2.11.x and earlier) uses the development cloud even when it is named **Codync**. Its `~/.codync` identity stays claimed in the development account, so Codync Dev phones list it and request access to it. Replace such a build with a release build, then unclaim that identity from the development account. Observed on 2026-10-10: a 2.11.2 local build ran as this Mac's production host.
 
 ## Local verification (2026-10-09)
 

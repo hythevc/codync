@@ -2,7 +2,7 @@
 
 use super::Hub;
 use crate::LockExt;
-use crate::store::{BotRow, ReadScope};
+use crate::store::BotRow;
 use anyhow::Result;
 use serde_json::{Value, json};
 
@@ -11,8 +11,19 @@ impl Hub {
         let cfg = &row.config;
         let mut v = serde_json::to_value(cfg).expect("BotConfig is plain data and always serializes");
         v["managedWorkspace"] = crate::agent::workspace::is_managed(cfg).into();
+        // Null where there is no switch to show.
+        v["harnessMemory"] =
+            (!cfg.is_group() && crate::agent::own_memory::switchable(cfg)).then_some(cfg.harness_memory).into();
+        if !cfg.is_group() {
+            v["sharedMemory"] = crate::chat::memory::shared(cfg).into();
+            v["memoryRev"] = self.store.memory_rev().into();
+        }
         let rt = if cfg.is_group() {
-            self.group_runtime(cfg)
+            // A group has no agent: Fast mode belongs to its members.
+            crate::hub::Runtime {
+                fast_mode: crate::agent::config::FastModeSupport::default(),
+                ..self.group_runtime(cfg)
+            }
         } else {
             self.runtime.locked().get(&cfg.id).cloned().unwrap_or_default()
         };
@@ -23,8 +34,13 @@ impl Hub {
         v["activity"] = rt.activity.into();
         v["startedAt"] = rt.started_at.into();
         v["workingChat"] = rt.lane.as_ref().map(|l| l.chat.clone()).into();
-        v["workingThread"] = rt.lane.and_then(|l| l.thread).into();
-        v["unread"] = self.store.unread(&cfg.id, row.read_rev, ReadScope::All).into();
+        v["fastModeSupport"] = rt.fast_mode.as_str().into();
+        if !cfg.is_group() {
+            v["agentStep"] = json!(rt.agent_step);
+            v["resting"] = json!(crate::agent::fallback::resting(&self.store, cfg, crate::store::now_ms()));
+        }
+        v["fastModeIssue"] = rt.fast_mode.issue().into();
+        v["unread"] = self.store.unread(&cfg.id, row.read_rev).into();
         let preview = last.as_ref().map(|l| match &l.author {
             // A group names who spoke.
             Some(author) if cfg.is_group() => format!("{}: {}", self.bot_name(author), l.text),

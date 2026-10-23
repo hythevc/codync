@@ -1,22 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { WindowCommand } from '@shared/ipc'
 import { isSSHConnecting, showsChat as shouldShowChat } from '@shared/ssh-startup'
 import { draftOf, type Bot, type BotDraft } from '@shared/models'
 import { CharacterAvatar } from '../components/Avatar'
-import { Button, ChoicePicker, IconButton } from '../components/Controls'
+import { Button, IconButton, ResizeHandle } from '../components/Controls'
 import { AnchoredMenu, Dialog, ModalHeader, Sheet, type MenuItem } from '../components/Overlay'
-import { font } from '../lib/fonts'
+import { HStack, Spacer } from '../components/Stack'
+import { Text } from '../components/Text'
 import { useModels } from '../lib/observable'
 import { prefs, stepTextSize, usePref, DEFAULT_TEXT_SIZE } from '../lib/prefs'
 import { useApp, StoreContext } from '../store/context'
-import { refKey, sameRef, parseRef, type BotRef } from '../store/app-model'
+import { account } from '../store/account'
+import { analytics } from '../store/analytics'
+import { refKey, sameRef, parseRef } from '../store/app-model'
 import type { BotStore } from '../store/bot-store'
 import { useComputerRoster } from '../store/computer-roster'
 import { BotRoster } from './BotRoster'
 import { SidebarFooter } from './SidebarFooter'
+import { UpdateBadge } from './UpdateButton'
 import { ComputerFilterHeader, computerSelection } from './ComputerFilterHeader'
 import { ThreadView } from './thread/ThreadView'
-import { NewChatView } from './bots/NewChatView'
+import { queueVoiceKey } from './thread/voice-shortcut-keys'
+import { NewBotView, NewGroupView } from './bots/NewBotView'
 import { BotEditorView } from './bots/BotEditorView'
 import { MarketplaceView } from './marketplace/MarketplaceView'
 import { SettingsView, type SettingsPage } from './settings/SettingsView'
@@ -27,16 +32,14 @@ import { ComputerAccessView } from './computer-access/ComputerAccessView'
 import { HostStateView } from './HostStateView'
 import { StartupRecovery } from './StartupRecovery'
 export { EmptyState } from './HostStateView'
-import { AnalyticsPrompt } from './AnalyticsPrompt'
 import { StarPrompt } from './StarPrompt'
 import { OpenVoiceSettings } from './call/CallView'
 import { AccountPanelLayer, DesktopActionMenu, ProfileAvatar } from './PanelMenus'
 import { useTraySummary } from './tray-summary'
+import { useIslandSummary } from './island-summary'
 import { useSSH, useSSHAttachments } from './settings/ssh-model'
 import './chat-window.css'
 import './sidebar-header.css'
-
-const isMac = window.codync.platform === 'darwin'
 
 /** Native desktop chat: roster on the left, the conversation on the right (Grok Bot's desktop layout). */
 export function ChatWindow() {
@@ -45,10 +48,13 @@ export function ChatWindow() {
   const [accessSetup, setAccessSetup] = usePref(prefs.computerAccessSetup)
   const [showAccess, setShowAccess] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
-  useTraySummary(app)
   useSSHAttachments(app)
   const ssh = useSSH()
   const showsChat = shouldShowChat(app.host.state.kind, app.computers.length, ssh.state)
+  const finishAccess = (ready: boolean, onboarding: boolean) => {
+    setAccessSetup(ready ? 'ready' : 'later')
+    analytics.track({ event: 'computer_access_finished', ready, onboarding })
+  }
 
   useEffect(
     () =>
@@ -76,9 +82,23 @@ export function ChatWindow() {
             if (ref) app.store(ref.computerId)?.stop(ref.botId)
             return
           }
+          case 'refresh':
+            return app.refresh()
           case 'setRemoteScreen':
             void app.setRemoteScreen(c.on)
             return
+          case 'respondPermission': {
+            const ref = parseRef(c.ref)
+            const store = ref ? app.store(ref.computerId) : null
+            const entry = ref ? store?.allEntries(ref.botId).find((e) => e.id === c.entryId) : undefined
+            if (store && entry) store.respond(entry, c.optionId)
+            return
+          }
+          case 'sendMessage': {
+            const ref = parseRef(c.ref)
+            if (ref) app.store(ref.computerId)?.send(c.text, ref.botId)
+            return
+          }
         }
       }),
     [app],
@@ -87,21 +107,28 @@ export function ChatWindow() {
   const approval = app.currentApproval
   return (
     <div className="chat-window">
+      <Summaries />
       {onboarded ? (
         accessSetup === null ? (
-          <ComputerAccessView onContinue={(ready) => setAccessSetup(ready ? 'ready' : 'later')} />
+          <ComputerAccessView onContinue={(ready) => finishAccess(ready, true)} />
         ) : showsChat ? (
           <ChatSplitView />
         ) : (
           <HostStateView />
         )
       ) : (
-        <AccountWelcomeView onContinue={() => setOnboarded(true)} />
+        <AccountWelcomeView
+          onContinue={() => {
+            setOnboarded(true)
+            analytics.track({ event: 'onboarding_completed', signed_in: account.isSignedIn })
+          }}
+        />
       )}
-      {onboarded && accessSetup !== null ? <><AnalyticsPrompt /><StarPrompt /></> : null}
+      {onboarded && accessSetup !== null && showsChat ? null : <div className="window-drag drag" />}
+      {onboarded && accessSetup !== null ? <StarPrompt /> : null}
       <Sheet open={showAccess} onClose={() => setShowAccess(false)} width={660} height={Math.min(820, window.innerHeight - 80)}>
-        <ModalHeader title="Computer access" />
-        <ComputerAccessView onContinue={(ready) => { setAccessSetup(ready ? 'ready' : 'later'); setShowAccess(false) }} />
+        <ModalHeader icon="hand.raised" title="Computer access" />
+        <ComputerAccessView onContinue={(ready) => { finishAccess(ready, false); setShowAccess(false) }} />
       </Sheet>
       <Dialog
         open={confirmReset}
@@ -118,6 +145,14 @@ export function ChatWindow() {
   )
 }
 
+/** Keeps the tray and the approval island current: it follows every store, so it renders nothing. */
+function Summaries() {
+  const app = useApp()
+  useTraySummary(app)
+  useIslandSummary(app)
+  return null
+}
+
 interface BotTarget {
   bot: Bot
   store: BotStore
@@ -129,6 +164,12 @@ interface EditTarget {
   store: BotStore
 }
 
+/** A new bot or group chat being made, and the computer it goes to. */
+interface CreateTarget {
+  kind: 'bot' | 'group'
+  computerId: string
+}
+
 function ChatSplitView() {
   const app = useApp()
   const ssh = useSSH()
@@ -137,10 +178,7 @@ function ChatSplitView() {
   const [sidebarWidth, setSidebarWidth] = usePref(prefs.sidebarWidth)
   const [hidden, setHidden] = usePref(prefs.hiddenComputers)
   const [searching, setSearching] = useState(false)
-  const [composing, setComposing] = useState(false)
-  const [composingGroup, setComposingGroup] = useState(false)
-  const [composeComputer, setComposeComputer] = useState<string | null>(null)
-  const previousSelection = useRef<BotRef | null>(null)
+  const [creating, setCreating] = useState<CreateTarget | null>(null)
   const [newMenu, setNewMenu] = useState(false)
   const [railNewMenu, setRailNewMenu] = useState(false)
   const [contextBot, setContextBot] = useState<{ target: BotTarget; x: number; y: number } | null>(null)
@@ -171,31 +209,30 @@ function ChatSplitView() {
   const shown = new Set(computerSelection(app.computers.map((c) => c.id), hidden).shown)
   const onlineStores = stores.filter((s) => shown.has(s.computer.id) && s.connection.kind === 'online' && !s.mismatch)
   const selectedStore = app.selectedStore
-  const composeStore = composeComputer ? app.store(composeComputer) : null
+  const createStore = creating ? app.store(creating.computerId) : null
   const roster = useComputerRoster(app, shown)
   const visibleRoster = roster.items
 
-  const compose = (group = false) => {
-    setComposingGroup(group)
+  const create = (kind: CreateTarget['kind']) => {
     // The selected bot's computer if it's online, else this computer, else any online one.
     const target = [selectedStore, app.local].find((s) => s && onlineStores.includes(s)) ?? onlineStores[0]
-    if (!target) return
-    if (!composing) previousSelection.current = app.selection
-    setComposeComputer(target.computer.id)
-    app.select(null)
-    setComposing(true)
+    if (target) setCreating({ kind, computerId: target.computer.id })
   }
-
-  useEffect(() => {
-    if (app.selection) setComposing(false)
-  }, [app.selection])
+  const computerChoice = creating && onlineStores.length > 1
+    ? { options: onlineStores.map((s) => ({ id: s.computer.id, label: s.hostName })), selection: creating.computerId, onChange: (computerId: string) => setCreating({ ...creating, computerId }) }
+    : null
 
   useEffect(
     () =>
       window.codync.app.onCommand((c) => {
-        if (c.kind === 'newChat' && onlineStores.length) compose()
+        if (c.kind === 'newBot' && onlineStores.length) create('bot')
         if (c.kind === 'search') setSearching(true)
         if (c.kind === 'toggleSidebar') setCompact(!prefs.sidebarCompact.get())
+        if (c.kind === 'voiceKey') {
+          // No chat open: talk to the top bot in the sidebar.
+          if (c.key === 'double' && !app.selection) app.select((roster.navigable[0] ?? roster.items[0])?.ref ?? null)
+          queueVoiceKey(c.key)
+        }
       }),
   )
 
@@ -204,10 +241,10 @@ function ChatSplitView() {
   useEffect(() => {
     const target = window.codync.debugOpen
     if (!target || debugOpened.current) return
-    if (target === 'compose' || target === 'group') {
+    if (target === 'newBot' || target === 'newGroup') {
       if (!onlineStores.length) return
       debugOpened.current = true
-      compose(target === 'group')
+      create(target === 'newBot' ? 'bot' : 'group')
     } else if (target === 'plugins') {
       if (!app.local) return
       debugOpened.current = true
@@ -224,8 +261,8 @@ function ChatSplitView() {
   })
 
   const newItems = (): MenuItem[] => [
-    { title: 'New chat', icon: 'square.and.pencil', action: () => compose() },
-    { title: 'New group chat', icon: 'person.2', action: () => compose(true) },
+    { title: 'New bot', icon: 'plus', action: () => create('bot') },
+    { title: 'New group chat', icon: 'person.2', action: () => create('group') },
   ]
 
   const openMarketplace = () => setMarketplace((selectedStore ?? app.local ?? onlineStores[0])?.computer.id ?? null)
@@ -240,10 +277,15 @@ function ChatSplitView() {
     { title: 'Delete', icon: 'trash', destructive: true, action: () => setConfirmDelete({ bot, store }) },
   ]
 
-  // ↑/↓ in the roster move the selection.
+  // ↑/↓ in the roster move the selection; Alt+↑/↓ moves the selected bot itself.
   const onListKey = (e: React.KeyboardEvent) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
     if (e.target instanceof HTMLElement && e.target.closest('.computer-roster-heading')) return
+    if (e.altKey) {
+      e.preventDefault()
+      if (app.selection) roster.moveBot(app.selection, e.key === 'ArrowUp' ? -1 : 1)
+      return
+    }
     const refs = roster.navigable.map((i) => i.ref)
     if (!refs.length) return
     e.preventDefault()
@@ -253,17 +295,12 @@ function ChatSplitView() {
   }
 
   // The sidebar's edge drags its width; narrower than 180 collapses it to the rail.
-  const dragStart = useRef<{ x: number; width: number } | null>(null)
-  const onDividerDown = (e: React.PointerEvent) => {
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    dragStart.current = { x: e.clientX, width: compact ? 76 : sidebarWidth }
-  }
-  const onDividerMove = (e: React.PointerEvent) => {
-    if (!dragStart.current) return
-    const proposed = dragStart.current.width + e.clientX - dragStart.current.x
+  const [resizing, setResizing] = useState(false)
+  const sidebarMax = Math.min(420, window.innerWidth - 420)
+  const resizeSidebar = (proposed: number) => {
     const nextCompact = proposed < 180
     if (nextCompact !== compact) setCompact(nextCompact)
-    if (!nextCompact) setSidebarWidth(Math.min(Math.max(260, proposed), Math.min(420, window.innerWidth - 420)))
+    if (!nextCompact) setSidebarWidth(Math.min(Math.max(260, proposed), sidebarMax))
   }
 
   const errorMessage = app.errorMessage
@@ -272,24 +309,7 @@ function ChatSplitView() {
   const selectedBot = selected && selectedStore?.bots.get(selected.botId)
 
   let detail: ReactNode
-  if (composing && composeStore) {
-    detail = (
-      <div className="detail-column" key={`${composeStore.computer.id}-${composingGroup}`}>
-        {onlineStores.length > 1 ? (
-          <ComputerPicker stores={onlineStores} value={composeStore.computer.id} onChange={setComposeComputer} />
-        ) : null}
-        <StoreContext.Provider value={composeStore}>
-          <NewChatView
-            group={composingGroup}
-            onClose={() => {
-              setComposing(false)
-              if (!app.selection) app.select(previousSelection.current)
-            }}
-          />
-        </StoreContext.Provider>
-      </div>
-    )
-  } else if (selected && selectedStore && selectedBot) {
+  if (selected && selectedStore && selectedBot) {
     detail = (
       <StoreContext.Provider value={selectedStore}>
         <ThreadView key={refKey(selected)} botId={selected.botId} />
@@ -300,15 +320,16 @@ function ChatSplitView() {
   } else {
     detail = (
       <div className="empty-detail">
-        <div style={{ display: 'flex' }}>
+        <div className="detail-drag drag" />
+        <HStack align="stretch" className="empty-detail-crew">
           <CharacterAvatar shape="blob" color="blue" size={60} mood="working" />
-          <CharacterAvatar shape="squircle" color="orange" size={60} style={{ marginLeft: -10 }} />
-          <CharacterAvatar shape="teardrop" color="violet" size={60} mood="working" style={{ marginLeft: -10 }} />
-        </div>
-        <div style={font('title2', 'semibold')}>{connecting ? 'Connecting to your computers…' : 'Your coding agents, as teammates.'}</div>
-        <div style={{ color: 'var(--secondary)', textAlign: 'center', maxWidth: 420 }}>{connecting ? 'Your bots will appear once connected. Manage computers to see connection progress.' : 'Pick a bot, or create one for each kind of work and point it at a project.'}</div>
-        <Button onClick={() => compose()} disabled={!onlineStores.length}>
-          New Bot
+          <CharacterAvatar shape="squircle" color="orange" size={60} />
+          <CharacterAvatar shape="teardrop" color="violet" size={60} mood="working" />
+        </HStack>
+        <Text as="div" size="title2" weight="semibold">{connecting ? 'Connecting to your computers…' : 'Your coding agents, as teammates.'}</Text>
+        <Text as="div" tone="secondary" className="empty-detail-message">{connecting ? 'Your bots will appear once connected. Manage computers to see connection progress.' : 'Pick a bot, or create one for each kind of work and point it at a project.'}</Text>
+        <Button onClick={() => create('bot')} disabled={!onlineStores.length}>
+          New bot
         </Button>
       </div>
     )
@@ -316,48 +337,49 @@ function ChatSplitView() {
 
   const width = compact ? 76 : sidebarWidth
   return (
-    <div className="split" style={{ pointerEvents: showAccount || contextBot ? 'none' : undefined }}>
-      <aside className={`sidebar ${compact ? 'compact' : ''}`} style={{ width }}>
-        <div className="sidebar-header drag" style={{ paddingLeft: compact ? 0 : isMac ? 80 : 18, opacity: compact ? 0 : 1, pointerEvents: compact ? 'none' : undefined }} aria-hidden={compact}>
-          <span style={{ flex: 1 }} />
-          <div className="no-drag" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div className={`split ${showAccount || contextBot ? 'covered' : ''}`}>
+      <aside className={`sidebar ${compact ? 'compact' : ''} ${resizing ? 'resizing' : ''}`} style={{ width }}>
+        <div className="sidebar-header drag" inert={compact}>
+          <Spacer />
+          <HStack gap={6} className="no-drag">
             <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={() => setSettings('computers')} compact />
             <IconButton title="Search" icon="magnifyingglass" size={32} className="sidebar-header-action" onClick={() => setSearching(true)} />
-            <IconButton title="New" icon="plus" size={32} className="sidebar-header-action" buttonRef={newButton} onClick={() => setNewMenu((o) => !o)} disabled={!onlineStores.length} />
-          </div>
+            <IconButton title="New" icon="plus" size={32} className="sidebar-header-action" buttonRef={newButton} menuOpen={newMenu} onClick={() => setNewMenu((o) => !o)} disabled={!onlineStores.length} />
+          </HStack>
           <AnchoredMenu open={newMenu} onClose={() => setNewMenu(false)} anchor={newButton} items={newItems} />
         </div>
         {compact ? (
-          <div style={{ width: 70, alignSelf: 'center' }} className="drag">
-            <div className="no-drag" style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="rail-header drag">
+            <HStack align="stretch" justify="center" className="no-drag">
               <ComputerFilterHeader hidden={hidden} setHidden={setHidden} manage={() => setSettings('computers')} compact />
-            </div>
+            </HStack>
           </div>
         ) : null}
         <div className="roster" ref={listRef} tabIndex={0} onKeyDown={onListKey}>
           <BotRoster roster={roster} compact={compact} onContext={(bot, store, x, y) => setContextBot({ target: { bot, store }, x, y })} />
           {visibleRoster.length === 0 && !roster.grouped && !compact && mismatchStores.length === 0 ? (
             <div className="roster-empty">
-              <div style={font(13, 'medium')}>{onlineStores.length ? 'No bots yet' : 'Waiting for a computer'}</div>
-              {onlineStores.length ? <div style={{ ...font(12), color: 'var(--secondary)' }}>Use + to start a new chat.</div> : null}
+              <Text as="div" size="body" weight="medium">{onlineStores.length ? 'No bots yet' : 'Waiting for a computer'}</Text>
+              {onlineStores.length ? <Text as="div" size="callout" tone="secondary">Use + to create a bot.</Text> : null}
             </div>
           ) : null}
         </div>
         {compact ? (
           <div className="rail-actions">
             <IconButton title="Search" icon="magnifyingglass" onClick={() => setSearching(true)} />
-            <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
+            <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} menuOpen={railNewMenu} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
             <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
-            <IconButton title="Connect apps" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
-            <button className="rail-profile" style={{ background: showAccount ? 'var(--bubble-agent)' : undefined }} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
+            <IconButton title="Extensions" icon="square.grid.2x2" size={36} onClick={openMarketplace} />
+            <UpdateBadge size={32} />
+            <button className={`rail-profile ${showAccount ? 'open' : ''}`} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
               <ProfileAvatar />
             </button>
           </div>
         ) : (
-          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onConnectApps={openMarketplace} />
+          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} />
         )}
       </aside>
-      <div className="sidebar-divider" onPointerDown={onDividerDown} onPointerMove={onDividerMove} onPointerUp={() => (dragStart.current = null)} role="separator" aria-label="Resize sidebar" aria-valuenow={width} />
+      <ResizeHandle label="Resize sidebar" width={width} min={76} max={sidebarMax} edge="trailing" onResize={resizeSidebar} onDragging={setResizing} />
       <main className="detail">
         {/* The call bar's settings open this window's Settings at Voice chat. */}
         <OpenVoiceSettings.Provider value={openVoiceSettings}>{detail}</OpenVoiceSettings.Provider>
@@ -396,10 +418,18 @@ function ChatSplitView() {
           </StoreContext.Provider>
         ) : null}
       </Sheet>
-      <Sheet open={marketplace !== null} onClose={() => setMarketplace(null)} width={Math.min(920, windowSize.width - 80)} height={sheetHeight}>
+      <Sheet open={creating !== null} onClose={() => setCreating(null)} maxHeight={sheetHeight}>
+        {creating && createStore ? (
+          <StoreContext.Provider value={createStore}>
+            {/* A group's bots belong to its computer: another computer starts it over. */}
+            {creating.kind === 'bot' ? <NewBotView computer={computerChoice} /> : <NewGroupView key={creating.computerId} computer={computerChoice} />}
+          </StoreContext.Provider>
+        ) : null}
+      </Sheet>
+      <Sheet open={marketplace !== null} onClose={() => setMarketplace(null)} width={Math.min(920, windowSize.width - 80)} height={sheetHeight} dismissOnDim>
         {marketplace && app.store(marketplace) ? (
           <StoreContext.Provider value={app.store(marketplace)!}>
-            <MarketplaceView appsFirst key={marketplace} computers={onlineStores.map((s) => ({ id: s.computer.id, name: s.hostName }))} computer={marketplace} onComputer={setMarketplace} />
+            <MarketplaceView key={marketplace} computers={onlineStores.map((s) => ({ id: s.computer.id, name: s.hostName }))} computer={marketplace} onComputer={setMarketplace} />
           </StoreContext.Provider>
         ) : null}
       </Sheet>
@@ -421,17 +451,6 @@ function ChatSplitView() {
         onClose={() => setConfirmDelete(null)}
       />
       <Dialog open={errorMessage !== null} title="Something went wrong" message={errorMessage} actions={[]} cancel="OK" onClose={() => app.clearErrors()} />
-    </div>
-  )
-}
-
-/** Which computer a new chat goes to, when more than one is online. */
-function ComputerPicker({ stores, value, onChange }: { stores: BotStore[]; value: string; onChange: (id: string) => void }) {
-  const options = useMemo(() => stores.map((s) => ({ id: s.computer.id, label: s.hostName })), [stores])
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 22px 0', ...font('callout') }}>
-      <span style={{ color: 'var(--secondary)' }}>On</span>
-      <ChoicePicker selection={value} options={options} onChange={onChange} />
     </div>
   )
 }

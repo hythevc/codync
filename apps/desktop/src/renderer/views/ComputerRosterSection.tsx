@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Icon } from '../components/Icon'
-import { reduceMotion } from '../lib/theme'
+import { pointerDrag } from '../lib/pointer-drag'
+import { useSlide } from '../lib/slide'
 import type { BotStore } from '../store/bot-store'
 import { ComputerBadge } from './ComputerBadge'
 import './computer-roster.css'
@@ -21,40 +22,30 @@ interface Props {
 
 export function ComputerRosterSection({ store, compact, collapsed, previous, next, dragged, setDragged, toggle, move, notice, children }: Props) {
   const section = useRef<HTMLElement>(null)
-  const lastTop = useRef<number | null>(null)
+  const dropTarget = useRef<string | null>(null)
   const id = store.computer.id
-  useLayoutEffect(() => {
-    const element = section.current
-    if (!element) return
-    const top = element.offsetTop
-    if (lastTop.current !== null && top !== lastTop.current && !reduceMotion()) {
-      element.animate([{ transform: `translateY(${lastTop.current - top}px)` }, { transform: 'translateY(0)' }], { duration: 300, easing: 'ease-out' })
-    }
-    lastTop.current = top
+  useSlide(section)
+  const drag = pointerDrag({
+    start: () => {
+      dropTarget.current = null
+      setDragged(id)
+    },
+    over: (_, under) => {
+      dropTarget.current = under?.closest<HTMLElement>('[data-computer-section]')?.dataset.computerSection ?? null
+    },
+    drop: () => {
+      if (dropTarget.current && dropTarget.current !== id) move(id, dropTarget.current)
+      setDragged(null)
+    },
+    cancel: () => setDragged(null),
   })
   return (
-    <section ref={section} className={`computer-roster-section ${dragged === id ? 'dragging' : ''}`} aria-label={store.hostName}
-      onDragOver={(event) => {
-        if (!dragged || dragged === id) return
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-      }}
-      onDrop={(event) => {
-        if (!dragged) return
-        event.preventDefault()
-        move(dragged, id)
-        setDragged(null)
-      }}>
+    <section ref={section} className={`computer-roster-section ${dragged === id ? 'dragging' : ''}`} aria-label={store.hostName} data-computer-section={id}>
       <div className="computer-roster-heading">
-        <button className="computer-roster-toggle" draggable aria-expanded={!collapsed}
+        <button className="computer-roster-toggle" aria-expanded={!collapsed}
           aria-label={`${store.hostName}, ${store.connectionLabel}`} title={`${store.hostName} · ${store.connectionLabel}. Drag to reorder.`}
           onClick={toggle}
-          onDragStart={(event) => {
-            event.dataTransfer.effectAllowed = 'move'
-            event.dataTransfer.setData('text/plain', id)
-            setDragged(id)
-          }}
-          onDragEnd={() => setDragged(null)}
+          {...drag}
           onKeyDown={(event) => {
             if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return
             event.preventDefault()

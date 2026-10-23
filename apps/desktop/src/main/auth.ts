@@ -2,7 +2,7 @@ import { app, ipcMain, shell } from 'electron'
 import { identity } from './environment'
 
 // Browser sign-ins that come back to this app on a custom scheme (ASWebAuthenticationSession's
-// job on the native apps): connector OAuth (`codync://oauth`) and the account (`com.pokai.Codync://callback`).
+// job on the iPhone): connector OAuth (`codync://oauth`) and the account (`com.pokai.Codync://callback`).
 
 export const SCHEMES = [identity.scheme, identity.appId]
 
@@ -14,6 +14,13 @@ interface Pending {
 }
 
 let pending: Pending | null = null
+
+/** The browser never came back: another sign-in took its place, or it ran out of time. */
+export class AuthenticationEnded extends Error {
+  constructor(readonly reason: 'cancelled' | 'timeout', message: string) {
+    super(message)
+  }
+}
 
 export function registerSchemes() {
   for (const scheme of SCHEMES) {
@@ -44,7 +51,7 @@ export function urlFromArgv(argv: string[]) {
 /** Opens `url` in the browser and waits (up to 10 minutes) for the return on `scheme`. */
 export function authenticate(url: string, scheme: string): Promise<string> {
   if (!/^https:\/\//.test(url)) return Promise.reject(new Error('Sign-in needs an https address.'))
-  pending?.reject(new Error('Another sign-in started.'))
+  pending?.reject(new AuthenticationEnded('cancelled', 'Another sign-in started.'))
   return new Promise((resolve, reject) => {
     pending = {
       scheme,
@@ -52,7 +59,7 @@ export function authenticate(url: string, scheme: string): Promise<string> {
       reject,
       timer: setTimeout(() => {
         pending = null
-        reject(new Error('Sign-in timed out.'))
+        reject(new AuthenticationEnded('timeout', 'Sign-in timed out.'))
       }, 10 * 60_000),
     }
     void shell.openExternal(url)

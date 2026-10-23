@@ -39,6 +39,7 @@ const LOCAL_ONLY: &[&str] = &[
     // Analytics is the computer owner's choice; phones decide only for themselves.
     "setAnalytics",
     "track",
+    "reportError",
     // Voice keys are entered on the computer itself; phones only use them.
     "setVoiceKey",
     "pairing",
@@ -46,8 +47,8 @@ const LOCAL_ONLY: &[&str] = &[
     "computerTools",
     "chatCall",
     "teamCall",
+    "manageCall",
     "memoryCall",
-    "memoryTools",
     "routineCall",
     "composioCall",
     "connectorTarget",

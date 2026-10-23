@@ -130,7 +130,7 @@ private func fakeDialer() -> (Dialer, AsyncStream<FakeSocket>) {
 private func helloBody() -> [String: Any] { [
     "hostId": "h1", "name": "Studio", "version": "3.0.0", "os": "macos", "backends": [], "rev": 0,
     "computerId": v.str("keys", "computerId"), "signKey": v.str("keys", "hostSignPub"), "boxKey": v.str("keys", "hostBoxPub"),
-    "urls": ["http://10.0.0.2:19222"], "cloud": "https://cloud.example.dev", "device": "macstudio", "protocol": 1,
+    "urls": ["http://10.0.0.2:19222"], "cloud": "https://cloud.example.dev", "device": "macstudio",
 ] }
 
 private func waitFor(_ states: AsyncStream<LinkState>, _ match: (LinkState) -> Bool) async -> LinkState? {
@@ -381,4 +381,11 @@ private func waitFor(_ states: AsyncStream<LinkState>, _ match: (LinkState) -> B
     await socket.toDevice.close(4100)
     #expect(await waitFor(t.states()) { if case .failed = $0 { true } else { false } } == .failed("Paired."))
     await t.shutdown()
+}
+
+@Test func lapsedLeaseIsRetriedNotARevocation() throws {
+    let reject = { (code: String) in ChannelTransport.rejection(try ChannelTransport.decodeWire(#"{"t":"reject","code":"\#(code)"}"#)) }
+    // The computer couldn't confirm the account's approval lately: the channel keeps trying.
+    guard case .wait(.failed) = try reject("leaseExpired") else { Issue.record("expected a retrying failure"); return }
+    guard case .stop(.unauthorized) = try reject("revoked") else { Issue.record("expected a revocation"); return }
 }

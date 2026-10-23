@@ -21,7 +21,7 @@ extension BotStore {
                 }
                 requestedSince = rev
                 windowFloors = [:]
-                for try await event in client.events(since: requestedSince, client: clientKind) {
+                for try await event in client.events(since: requestedSince, client: "ios") {
                     guard !Task.isCancelled, !retired else { return }
                     setConnection(.online)
                     backoff = 1
@@ -67,7 +67,7 @@ extension BotStore {
         let cached = cacheStamp.map { $0 != "\(Self.appBuild)/\(new.version)" } ?? false
         if cached || (hostVersion.map { $0.version != new.version } ?? false) {
             // A different host version or app build: data may carry new fields, so fetch it all again.
-            rev = 0
+            refetchAll()
             rewound = false
             unreadable = false
         }
@@ -121,7 +121,7 @@ extension BotStore {
             bump(e.rev)
             acknowledgeVisibleConversations(e.botId, entry: e)
             let calls = Array(voiceCalls.values).filter { $0.botId == e.botId && e.rev > $0.startRev }
-            if e.kind == "agent", e.threadId == nil, e.data.final == true, known?.data.final != true, let text = e.data.text {
+            if e.kind == "agent", e.data.final == true, known?.data.final != true, let text = e.data.text {
                 calls.forEach { $0.speak(spokenReply(e, text)) }
             }
             // A group has no status of its own: its members' approvals arrive as cards.
@@ -133,8 +133,6 @@ extension BotStore {
             setUsage(u)
         case let .screen(s):
             screen = s
-        case .accessRequests, .cloud:
-            break // The computer's own screens only (loopback).
         case .resync:
             restartEvents()
         case let .undecodable(type):
@@ -142,7 +140,7 @@ extension BotStore {
             log.error("undecodable \(type) event")
             if !rewound {
                 rewound = true
-                rev = 0
+                refetchAll()
                 restartEvents()
             } else if !unreadable {
                 Motion.animate { unreadable = true }
@@ -174,6 +172,16 @@ extension BotStore {
         saveCache()
     }
 
+    /// Fetches everything again from rev 0. That catch-up brings only each chat's newest entries, so
+    /// the ones held now go too: an older one kept would hide the gap from `loadOlder`, which
+    /// pages from the oldest one held. Messages still sending stay.
+    private func refetchAll() {
+        rev = 0
+        entries = entries.mapValues { $0.filter { $0.id.hasPrefix("local-") } }
+            .filter { !$0.value.isEmpty }
+        historyComplete = []
+    }
+
     /// Resubscribes from the current `rev` on the same link.
     private func restartEvents() {
         guard let client, eventsTask != nil else { return }
@@ -186,22 +194,22 @@ extension BotStore {
         if !caughtUp && rev >= catchUpRev { caughtUp = true }
     }
 
-    /// Per bot, the lowest synced main-chat `seq` in the mirror (optimistic entries don't count).
+    /// Per bot, the lowest synced `seq` in the mirror (optimistic entries don't count).
     /// Only entries the mirror had at `requestedSince`: newer ones (a send's RPC response landing
     /// before this hello) come again in this catch-up and say nothing about the window.
     private func loadedFloors() -> [String: Int64] {
         entries.compactMapValues { list in
-            list.filter { $0.threadId == nil && $0.seq > 0 && $0.seq != .max && $0.rev <= requestedSince }.map(\.seq).min()
+            list.filter { $0.seq > 0 && $0.seq != .max && $0.rev <= requestedSince }.map(\.seq).min()
         }
     }
 
-    /// An entry event the mirror doesn't hold, in the main chat, below the floor the mirror had
+    /// An entry event the mirror doesn't hold, below the floor the mirror had
     /// when this connection started: it existed before the window and arrives only because its
     /// rev was bumped (a rewrite, a reaction). Inserting it would hide the gap from `loadOlder`,
     /// which pages from the oldest loaded `seq`; history paging brings it. `seq` follows insert
     /// order, so anything created since the mirror was last synced sits above the floor.
     static func isOutsideLoadedWindow(_ e: Entry, floor: Int64?, held: Bool) -> Bool {
-        guard e.threadId == nil, !held, let floor else { return false }
+        guard !held, let floor else { return false }
         return e.seq < floor
     }
 

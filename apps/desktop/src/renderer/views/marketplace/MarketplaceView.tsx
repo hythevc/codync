@@ -1,20 +1,23 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Backend } from '@shared/models'
-import { Button, CardForm, CardSection, DropdownMenu, IconButton, Spinner } from '../../components/Controls'
+import { Button, DropdownMenu, IconButton, Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Dialog, useDismiss } from '../../components/Overlay'
-import { font } from '../../lib/fonts'
+import { Dialog, SheetPage, useDismiss } from '../../components/Overlay'
+import { HStack, Spacer, VStack } from '../../components/Stack'
+import { Text } from '../../components/Text'
 import { useStore } from '../../store/context'
+import { useScreenViewed } from '../../store/analytics'
 import { ComputerBadge } from '../ComputerBadge'
-import { AgentSheet, AgentTile } from './AgentSheet'
-import { ComposioSection } from './ComposioViews'
+import { AgentSheet, AgentTile, NodeNotice } from './AgentSheet'
 import { CredentialsView } from './CredentialsView'
 import { CustomConnectorSheet, InstallConnectorSheet, NewSkillSheet } from './ConnectorSheets'
+import { SetupTerminalView } from './SetupTerminal'
+import { SkillSheet, type SkillRef } from './SkillSheet'
 import {
   appendPage, emptyPage, errorText, hasHiddenItems, market, needsSignIn, replacePage, revealMore, visible,
   type MarketConnector, type MarketSkill,
 } from './market-models'
-import { AppLogo, FormSheet, ItemGrid, MarketRow, MarketSection, ScreenHeader, ServiceLogo, SkeletonGrid, SkillGlyph, SlideStack, TileIcon } from './pieces'
+import { AppLogo, FormSheet, ItemGrid, ItemRow, MarketRow, MarketSection, ScreenHeader, ServiceLogo, SkeletonGrid, SkillGlyph, SlideStack, TileIcon } from './pieces'
 import { usePlugins } from './plugins'
 
 const connectorId = (c: MarketConnector) => c.name
@@ -25,13 +28,12 @@ const connectorId = (c: MarketConnector) => c.name
  * computer; each bot turns connectors and skills on in its settings.
  * With more than one computer, the header switches between them (the caller swaps the store).
  */
-export function MarketplaceView({ computers, computer, onComputer, appsFirst = false }: { appsFirst?: boolean; computers: { id: string; name: string }[]; computer: string; onComputer: (id: string) => void }) {
+export function MarketplaceView({ computers, computer, onComputer }: { computers: { id: string; name: string }[]; computer: string; onComputer: (id: string) => void }) {
   const store = useStore()
   const plugins = usePlugins(store)
   const dismiss = useDismiss()
+  useScreenViewed('marketplace')
   const [search, setSearch] = useState('')
-  /** Bumped on each submitted search, so every section searches again. */
-  const [searchToken, setSearchToken] = useState(0)
   const [connectors, setConnectors] = useState(emptyPage<MarketConnector>)
   /** The registry page after the ones shown; null at the end. */
   const [connectorCursor, setConnectorCursor] = useState<string | null>(null)
@@ -44,7 +46,9 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
   const [busySkill, setBusySkill] = useState<string | null>(null)
   const [addingConnector, setAddingConnector] = useState(false)
   const [writingSkill, setWritingSkill] = useState(false)
+  const [viewingSkill, setViewingSkill] = useState<SkillRef | null>(null)
   const [agent, setAgent] = useState<Backend | null>(null)
+  const [addingNode, setAddingNode] = useState(false)
   /** Agents shown before "Load more agents" (two rows of the grid). */
   const [agentLimit, setAgentLimit] = useState(10)
   const [showInstalled, setShowInstalled] = useState(false)
@@ -120,7 +124,6 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
   }, [])
 
   const submit = (q: string) => {
-    setSearchToken((t) => t + 1)
     void loadConnectors(q)
   }
 
@@ -137,36 +140,39 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
   const header = (
     <div className="market-heading">
       {/* Everything here lives on one computer; say which. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <HStack gap={10} shrink>
         <ComputerBadge computer={store.computer} size={32} />
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, whiteSpace: 'nowrap' }}>
-          <span style={{ ...font('title', 'semibold'), color: 'var(--text)' }}>{appsFirst ? 'Connect apps' : 'Marketplace'}</span>
+        <VStack shrink className="market-heading-titles">
+          <Text size="title" weight="semibold" tone="text">Extensions</Text>
           {computers.length > 1 ? (
             <DropdownMenu
               title="Switch computer"
-              style={{ display: 'flex', alignItems: 'center', gap: 4, ...font('subheadline'), color: 'var(--secondary)', minWidth: 0 }}
+              className="market-computer-switch"
               items={() => computers.map((c) => ({ title: c.name, selected: c.id === computer, action: () => onComputer(c.id) }))}
             >
-              <span aria-label={`Computer: ${store.hostName}`} style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{store.hostName}</span>
+              <Text truncate aria-label={`Computer: ${store.hostName}`}>{store.hostName}</Text>
               <Icon name="chevron.down" size={10} weight="semibold" />
             </DropdownMenu>
           ) : (
-            <span style={{ ...font('subheadline'), color: 'var(--secondary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>{store.hostName}</span>
+            <Text size="subheadline" tone="secondary" truncate>{store.hostName}</Text>
           )}
-        </div>
-      </div>
-      <span style={{ flex: 1 }} />
+        </VStack>
+      </HStack>
+      <Spacer />
       <Button kind="secondary" onClick={() => setShowCredentials(true)}><Icon name="lock.shield" size={12} />Credentials</Button>
       {installedCount > 0 ? (
-        <button className="press" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }} onClick={() => setShowInstalled(true)}>
-          <span style={{ display: 'flex' }}>
-            {plugins.installedConnectors.slice(0, 3).map((c, i) => (
-              <span key={c.id} style={{ marginLeft: i ? -8 : 0, display: 'flex' }}>
+        <button className="press market-installed" onClick={() => setShowInstalled(true)}>
+          <HStack as="span" align="stretch" className="market-installed-logos">
+            {plugins.installedConnectors.slice(0, 3).map((c) => (
+              <HStack as="span" align="stretch" key={c.id}>
                 <ServiceLogo name={c.name} registryName={c.registryName} size={26} />
-              </span>
+              </HStack>
             ))}
-          </span>
-          <span style={{ color: 'var(--secondary)', whiteSpace: 'nowrap' }}>{installedCount} installed</span>
+          </HStack>
+          <VStack as="span" align="flex-start" className="market-installed-text">
+            <Text tone="secondary">{installedCount} installed</Text>
+            <Text size="caption" tone="secondary">Connectors & skills</Text>
+          </VStack>
           <Icon name="chevron.right" size={10} weight="semibold" color="var(--tertiary)" />
         </button>
       ) : null}
@@ -193,7 +199,7 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
         <button
           aria-label="Clear search"
           title="Clear search"
-          style={{ display: 'flex', color: 'var(--tertiary)' }}
+          className="market-search-clear"
           onClick={() => {
             setSearch('')
             setAgentLimit(10)
@@ -206,7 +212,7 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
     </div>
   )
 
-  const centered = (node: ReactNode) => <div style={{ display: 'flex', justifyContent: 'center' }}>{node}</div>
+  const centered = (node: ReactNode) => <HStack align="stretch" justify="center">{node}</HStack>
 
   const page = (
     <div className="market-page">
@@ -214,9 +220,9 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
         <div className="market-page-content">
           {header}
           {searchField}
-          {appsFirst ? <ComposioSection query={query} searchToken={searchToken} /> : null}
           {agents.length > 0 ? (
             <MarketSection title={query ? `Agents matching “${query}”` : 'Agents'}>
+              {allAgents.some((b) => b.node === 'missing') ? <NodeNotice onAdd={() => setAddingNode(true)} /> : null}
               <div className="agent-grid">
                 {agents.slice(0, agentLimit).map((b) => <AgentCard key={b.id} backend={b} onClick={() => setAgent(b)} />)}
               </div>
@@ -227,7 +233,7 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
             {loadingConnectors ? (
               <SkeletonGrid />
             ) : connectors.items.length === 0 ? (
-              <span style={{ color: 'var(--secondary)' }}>{query ? `No connectors match “${query}”.` : "Couldn't load connectors."}</span>
+              <Text tone="secondary">{query ? `No connectors match “${query}”.` : "Couldn't load connectors."}</Text>
             ) : (
               <>
                 <ItemGrid>
@@ -252,7 +258,6 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
               </>
             )}
           </MarketSection>
-          {!appsFirst ? <ComposioSection query={query} searchToken={searchToken} /> : null}
           <MarketSection title="Skills">
             {loadingSkills ? (
               <SkeletonGrid />
@@ -267,6 +272,7 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
                     busy={busySkill === s.source}
                     icon={<SkillGlyph />}
                     onAdd={() => void installSkill(s)}
+                    onOpen={() => setViewingSkill(s)}
                   />
                 ))}
               </ItemGrid>
@@ -292,10 +298,10 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
               />
             </ItemGrid>
           </MarketSection>
-          {error ? <span style={{ ...font('footnote'), color: 'var(--danger)' }}>{error}</span> : null}
-          <span style={{ ...font('footnote'), color: 'var(--tertiary)' }}>
-            Connectors come from the official MCP Registry, apps through Composio, skills from Anthropic, agents from the ACP registry. Everything installs on {store.hostName}.
-          </span>
+          {error ? <Text size="footnote" tone="danger">{error}</Text> : null}
+          <Text size="footnote" tone="tertiary">
+            Connectors come from the official MCP Registry, skills from Anthropic, agents from the ACP registry. Everything installs on {store.hostName}.
+          </Text>
         </div>
       </div>
       {/* Dismissing slides the sheet away; clearing the caller's state would cut it off. */}
@@ -317,7 +323,13 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
       <FormSheet open={writingSkill} onClose={() => setWritingSkill(false)}>
         <NewSkillSheet />
       </FormSheet>
-      <FormSheet open={agent !== null} onClose={() => setAgent(null)} width={560} height={560}>
+      <FormSheet open={viewingSkill !== null} onClose={() => setViewingSkill(null)}>
+        {viewingSkill ? <SkillSheet key={viewingSkill.name} skill={viewingSkill} /> : null}
+      </FormSheet>
+      <FormSheet open={addingNode} onClose={() => setAddingNode(false)} width={560} height={560} fixed>
+        {addingNode ? <SetupTerminalView backend={null} step="node" back={() => setAddingNode(false)} /> : null}
+      </FormSheet>
+      <FormSheet open={agent !== null} onClose={() => setAgent(null)} width={560} height={560} fixed>
         {agent ? <AgentSheet key={agent.id} initial={agent} /> : null}
       </FormSheet>
     </>
@@ -325,21 +337,21 @@ export function MarketplaceView({ computers, computer, onComputer, appsFirst = f
 }
 
 function AgentCard({ backend, onClick }: { backend: Backend; onClick: () => void }) {
-  const status = backend.installed === true
-    ? (backend.signedIn === false ? 'Not signed in' : 'Installed')
-    : backend.curated === true ? 'Not installed' : 'Sets up on first use'
+  const status = backend.installed !== true && backend.curated === true ? 'Not installed'
+    : backend.node === 'missing' ? 'Needs Node.js'
+    : backend.installed !== true ? 'Sets up on first use'
+    : backend.signedIn === false ? 'Not signed in'
+    : 'Installed'
   return (
     <button className="agent-card" title={backend.name} onClick={onClick}>
-      <AgentTile registry={backend.registry} icon={24} tile={40} radius={11} />
-      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, minWidth: 0 }}>
-        <span style={{ ...font('subheadline', 'semibold'), color: 'var(--text)', ...ellipsis }}>{backend.name}</span>
-        <span style={{ ...font('caption'), color: 'var(--secondary)', ...ellipsis }}>{status}</span>
-      </span>
+      <AgentTile registry={backend.registry ?? backend.id} icon={24} tile={40} radius={11} />
+      <VStack as="span" align="flex-start" gap={3} shrink>
+        <Text size="subheadline" weight="semibold" tone="text" truncate className="agent-card-line">{backend.name}</Text>
+        <Text size="caption" tone="secondary" truncate className="agent-card-line">{status}</Text>
+      </VStack>
     </button>
   )
 }
-
-const ellipsis = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' } as const
 
 // MARK: - Installed
 
@@ -348,6 +360,7 @@ function InstalledView({ back }: { back: () => void }) {
   const plugins = usePlugins(store)
   const [removing, setRemoving] = useState<{ id: string; name: string; isSkill: boolean } | null>(null)
   const [signingIn, setSigningIn] = useState<string | null>(null)
+  const [viewingSkill, setViewingSkill] = useState<SkillRef | null>(null)
   const empty = plugins.installedConnectors.length === 0 && plugins.installedSkills.length === 0
 
   const signIn = async (id: string) => {
@@ -370,39 +383,50 @@ function InstalledView({ back }: { back: () => void }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
-      <ScreenHeader title="Installed" onBack={back} />
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <CardForm>
-          {empty ? <EmptyState icon="shippingbox" title="Nothing installed" detail="Connectors and skills you add show up here." /> : null}
-          {plugins.installedConnectors.length ? (
-            <CardSection title="Connectors">
-              {plugins.installedConnectors.map((c) => (
-                <InstalledRow
-                  key={c.id}
-                  title={c.name}
-                  subtitle={needsSignIn(c) ? 'Sign in so bots can use it' : (c.command ?? c.url ?? c.description)}
-                  icon={c.kind === 'composio' ? <AppLogo url={c.logo} name={c.name} size={32} /> : <ServiceLogo name={c.name} registryName={c.registryName} size={32} />}
-                  accessory={signingIn === c.id ? <Spinner /> : needsSignIn(c) ? <Button onClick={() => void signIn(c.id)}>Sign in</Button> : null}
-                  onRemove={() => setRemoving({ id: c.id, name: c.name, isSkill: false })}
-                />
-              ))}
-            </CardSection>
-          ) : null}
-          {plugins.installedSkills.length ? (
-            <CardSection title="Skills">
-              {plugins.installedSkills.map((s) => (
-                <InstalledRow
-                  key={s.id}
-                  title={s.name}
-                  subtitle={s.description}
-                  icon={<SkillGlyph size={32} />}
-                  onRemove={() => setRemoving({ id: s.id, name: s.name, isSkill: true })}
-                />
-              ))}
-            </CardSection>
-          ) : null}
-        </CardForm>
+    <SheetPage>
+      <ScreenHeader title="Connectors & skills" onBack={back} />
+      <div className="market-installed-body">
+        <div className="market-scroll">
+          <div className="market-page-content">
+            {empty ? <EmptyState icon="shippingbox" title="Nothing installed" detail="Connectors and skills you add show up here." /> : null}
+            {plugins.installedConnectors.length ? (
+              <MarketSection title="Connectors">
+                <ItemGrid>
+                  {plugins.installedConnectors.map((c) => (
+                    <ItemRow
+                      key={c.id}
+                      title={c.name}
+                      subtitle={needsSignIn(c) ? 'Sign in so bots can use it' : (c.command ?? c.url ?? c.description)}
+                      icon={c.kind === 'composio' ? <AppLogo url={c.logo} name={c.name} /> : <ServiceLogo name={c.name} registryName={c.registryName} />}
+                      trailing={(
+                        <>
+                          {signingIn === c.id ? <Spinner /> : needsSignIn(c) ? <Button onClick={() => void signIn(c.id)}>Sign in</Button> : null}
+                          <RemoveButton title={c.name} onClick={() => setRemoving({ id: c.id, name: c.name, isSkill: false })} />
+                        </>
+                      )}
+                    />
+                  ))}
+                </ItemGrid>
+              </MarketSection>
+            ) : null}
+            {plugins.installedSkills.length ? (
+              <MarketSection title="Skills">
+                <ItemGrid>
+                  {plugins.installedSkills.map((s) => (
+                    <ItemRow
+                      key={s.id}
+                      title={s.name}
+                      subtitle={s.description}
+                      icon={<SkillGlyph />}
+                      onOpen={() => setViewingSkill({ id: s.id, name: s.name, description: s.description })}
+                      trailing={<RemoveButton title={s.name} onClick={() => setRemoving({ id: s.id, name: s.name, isSkill: true })} />}
+                    />
+                  ))}
+                </ItemGrid>
+              </MarketSection>
+            ) : null}
+          </div>
+        </div>
       </div>
       <Dialog
         open={removing !== null}
@@ -411,39 +435,36 @@ function InstalledView({ back }: { back: () => void }) {
         actions={removing ? [{ title: 'Remove', destructive: true, action: () => void remove(removing) }] : []}
         onClose={() => setRemoving(null)}
       />
-    </div>
+      <FormSheet open={viewingSkill !== null} onClose={() => setViewingSkill(null)}>
+        {viewingSkill ? <SkillSheet key={viewingSkill.name} skill={viewingSkill} /> : null}
+      </FormSheet>
+    </SheetPage>
   )
 }
 
 /** A quiet "nothing here" message (replaces `ContentUnavailableView`). */
 function EmptyState({ icon, title, detail }: { icon: string; title: string; detail: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '40px 0', textAlign: 'center' }}>
+    <VStack align="center" gap={8} className="market-empty">
       <Icon name={icon} size={28} color="var(--tertiary)" />
-      <span style={{ ...font('compactBody', 'semibold'), color: 'var(--text)' }}>{title}</span>
-      <span style={{ ...font('compactSecondary'), color: 'var(--secondary)' }}>{detail}</span>
-    </div>
+      <Text size="compactBody" weight="semibold" tone="text">{title}</Text>
+      <Text size="compactSecondary" tone="secondary">{detail}</Text>
+    </VStack>
   )
 }
 
-function InstalledRow({ title, subtitle, icon, accessory, onRemove }: { title: string; subtitle: string; icon: ReactNode; accessory?: ReactNode; onRemove: () => void }) {
+function RemoveButton({ title, onClick }: { title: string; onClick: () => void }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }} title={subtitle}>
-      {icon}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 }}>
-        <span style={{ color: 'var(--text)', ...ellipsis }}>{title}</span>
-        <span style={{ ...font('caption'), color: 'var(--secondary)', ...ellipsis }}>{subtitle}</span>
-      </div>
-      <span style={{ minWidth: 12 }} />
-      {accessory}
-      <button
-        title="Remove"
-        aria-label={`Remove ${title}`}
-        style={{ minWidth: 44, minHeight: 44, display: 'grid', placeItems: 'center', color: 'var(--secondary)', margin: '-8px 0' }}
-        onClick={onRemove}
-      >
-        <Icon name="trash" size={13} />
-      </button>
-    </div>
+    <button
+      title="Remove"
+      aria-label={`Remove ${title}`}
+      className="market-remove"
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+    >
+      <Icon name="trash" size={13} />
+    </button>
   )
 }

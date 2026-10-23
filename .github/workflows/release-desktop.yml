@@ -44,6 +44,9 @@ jobs:
 
   macos:
     needs: check
+    # Fork PRs get no signing secrets, so they stop at check, Windows and Linux; the release PR into main
+    # builds the Mac app before the tag.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +61,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: host
+          # Saved on main by rust-cache.yml.
+          shared-key: desktop-macos
 
       - name: Install Apple certificate
         env:
@@ -83,7 +88,6 @@ jobs:
           cp "$(swift build -c release --arch arm64 --arch x86_64 --package-path apps/desktop/native/speech-macos --show-bin-path)/codync-speech" \
             apps/desktop/build/native/codync-speech
           # Codync Screen is built by `npm run dist:mac:main` (tools/native-screen.mjs).
-          xcodebuild -downloadComponent MetalToolchain || true
           command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate --spec apps/project.yml
           swift packaging/dmg/background.swift apps/desktop/build/dmg-background.tiff
@@ -117,9 +121,6 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
           VERSION=$(node -p 'require("./apps/desktop/package.json").version')
-          # The iPhone app this release needs: Macs with iPhones wait until the App Store has it.
-          MIN_APP=$(apps/desktop/build/native/codync-host compat | python3 -c 'import json,sys; print(json.load(sys.stdin)["minApp"])')
-          printf 'minApp: %s\n' "$MIN_APP" >> apps/desktop/dist/latest-mac.yml
           # Installs of the earlier native app update through Sparkle: one more appcast, now for the zip.
           test -n "$SPARKLE_PRIVATE_KEY" || { echo 'SPARKLE_PRIVATE_KEY is required'; exit 1; }
           curl -sSL https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz | tar xJ -C "$RUNNER_TEMP"
@@ -127,7 +128,6 @@ jobs:
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/bin/generate_appcast" --ed-key-file - --maximum-deltas 0 \
             --download-url-prefix "https://github.com/leepokai/Codync/releases/download/v${VERSION}/" \
             --link https://www.codync.dev/ -o build/appcast.xml build/updates
-          python3 packaging/updates/annotate-appcast.py build/appcast.xml "$MIN_APP"
           python3 -m venv "$RUNNER_TEMP/update-verification"
           "$RUNNER_TEMP/update-verification/bin/pip" install 'cryptography>=44,<47'
           "$RUNNER_TEMP/update-verification/bin/python" packaging/updates/verify-appcast.py \
@@ -149,26 +149,13 @@ jobs:
         run: |
           cd apps/desktop/dist
           shasum -a 256 codync-macos.dmg > codync-macos.dmg.sha256
-          FILES="codync-macos.dmg codync-macos.dmg.sha256 codync-macos.zip codync-macos.zip.blockmap latest-mac.yml ../../../build/appcast.xml"
-          # The host workflow may have created this release already (same tag).
-          gh release create "$GITHUB_REF_NAME" $FILES --title "Codync $GITHUB_REF_NAME" --generate-notes ||
+          FILES="codync-macos.dmg codync-macos.dmg.sha256 codync-macos.zip codync-macos.zip.blockmap"
+          # Auto Tag or the host workflow has usually created this release already (same tag). Not
+          # latest: release-gate.yml marks it (and updates the Homebrew tap) once it's safe to offer.
+          gh release create "$GITHUB_REF_NAME" $FILES --title "Codync $GITHUB_REF_NAME" --generate-notes --latest=false ||
             gh release upload "$GITHUB_REF_NAME" $FILES --clobber
-
-      - name: Update Homebrew tap
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          SHA=$(shasum -a 256 apps/desktop/dist/codync-macos.dmg | awk '{print $1}')
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
-          mkdir -p tap/Casks
-          sed -e "s/^  version .*/  version \"$VERSION\"/" -e "s/REPLACE_WITH_SHA256/$SHA/" packaging/homebrew/codync.rb > tap/Casks/codync.rb
-          cp packaging/homebrew/README.md tap/
-          cd tap
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Update Codync to $VERSION" || exit 0
-          git push
+          # Update feeds last: the release gate takes a release with all its feeds as fully uploaded.
+          gh release upload "$GITHUB_REF_NAME" latest-mac.yml ../../../build/appcast.xml --clobber
 
   windows:
     needs: check
@@ -215,11 +202,17 @@ jobs:
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          make_latest: false
           files: |
             apps/desktop/dist/codync-windows-x64.exe
             apps/desktop/dist/codync-windows-x64.exe.sha256
             apps/desktop/dist/codync-windows-x64.exe.blockmap
-            apps/desktop/dist/latest.yml
+      # The update feed last, once the installer it points at is downloadable.
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          make_latest: false
+          files: apps/desktop/dist/latest.yml
 
   linux:
     needs: check
@@ -237,7 +230,6 @@ jobs:
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
       # The Linux app uses the installed codync-host (codync-host-linux-*.tar.gz, host.yml).
-      - run: sudo apt-get update && sudo apt-get install -y rpm
       - name: Build
         working-directory: apps/desktop
         run: |
@@ -261,6 +253,11 @@ jobs:
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            apps/desktop/dist/codync-${{ matrix.name }}.*
-            apps/desktop/dist/latest-linux*.yml
+          make_latest: false
+          files: apps/desktop/dist/codync-${{ matrix.name }}.*
+      # The update feed last, once the packages it points at are downloadable.
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          make_latest: false
+          files: apps/desktop/dist/latest-linux*.yml

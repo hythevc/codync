@@ -2,10 +2,24 @@ import * as L from 'lucide'
 
 type IconNode = L.IconNode
 
-// The closest Lucide icon for each SF Symbol, for platforms without SF Symbols (Linux).
+// Lucide has no brand marks (its Apple is the fruit): the filled logo, from Simple Icons (CC0).
+const appleLogo: IconNode = [
+  [
+    'path',
+    {
+      fill: 'currentColor',
+      stroke: 'none',
+      d: 'M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701',
+    },
+  ],
+]
+
+// The closest Lucide icon for each SF Symbol, for platforms without SF Symbols (Linux, Windows).
 const map: Record<string, IconNode> = {
+  archivebox: L.Archive,
   'arrow.clockwise': L.RotateCw,
   'arrow.counterclockwise': L.RotateCcw,
+  'arrow.uturn.backward': L.Undo2,
   'arrow.down': L.ArrowDown,
   'arrow.down.to.line': L.Download,
   'arrow.down.circle': L.CircleArrowDown,
@@ -18,16 +32,19 @@ const map: Record<string, IconNode> = {
   'arrow.right.to.line': L.ArrowRightToLine,
   'arrow.triangle.2.circlepath': L.RefreshCw,
   'arrow.triangle.branch': L.GitBranch,
+  'arrow.turn.down.right': L.CornerDownRight,
   'arrow.up': L.ArrowUp,
   'arrow.up.right.square': L.SquareArrowOutUpRight,
   'arrowshape.turn.up.left': L.Reply,
-  'apple.logo': L.Apple,
+  'apple.logo': appleLogo,
   'bell.badge': L.BellDot,
   bolt: L.Zap,
   book: L.BookOpen,
   'book.closed': L.Book,
   'book.pages': L.BookOpenText,
+  brain: L.Brain,
   'bubble.left': L.MessageSquare,
+  'bubble.left.fill': L.MessageSquare,
   'bubble.left.and.bubble.right': L.MessagesSquare,
   calendar: L.Calendar,
   'chart.bar': L.ChartColumn,
@@ -78,6 +95,7 @@ const map: Record<string, IconNode> = {
   'gauge.with.dots.needle.33percent': L.Gauge,
   gearshape: L.Settings,
   globe: L.Globe,
+  'house.fill': L.House,
   hammer: L.Hammer,
   'hand.point.up.left': L.Pointer,
   'hand.raised': L.Hand,
@@ -98,6 +116,7 @@ const map: Record<string, IconNode> = {
   macstudio: L.Server,
   magnifyingglass: L.Search,
   mic: L.Mic,
+  moon: L.Moon,
   'mic.fill': L.Mic,
   'mic.slash': L.MicOff,
   'mic.slash.fill': L.MicOff,
@@ -147,6 +166,7 @@ const map: Record<string, IconNode> = {
   terminal: L.Terminal,
   'text.bubble': L.MessageSquareText,
   tray: L.Inbox,
+  'tray.and.arrow.up': L.ArchiveRestore,
   trash: L.Trash2,
   waveform: L.AudioLines,
   wifi: L.Wifi,

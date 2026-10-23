@@ -3,20 +3,18 @@ import SwiftUI
 
 /// "Full conversation": everything the agent did — narration, thinking, tool
 /// calls with output and diffs, plans — grouped by turn.
-/// A chat's trace, or one thread's (`thread`: its root).
 public struct TraceView: View {
     let botId: String
-    let thread: String?
 
-    public init(botId: String, thread: String? = nil) {
-        self.botId = botId
-        self.thread = thread
-    }
+    public init(botId: String) { self.botId = botId }
     @Environment(BotStore.self) private var model
 
     public var body: some View {
-        let turns = Dictionary(grouping: model.allEntries(botId).filter { $0.threadId == thread }, by: \.turn)
+        let all = model.chat(botId)
+        let turns = Dictionary(grouping: all, by: \.turn)
             .sorted { $0.key < $1.key }
+        // The running turn's thoughts start unfolded.
+        let running = Self.runningTurn(all, working: model.bots[botId]?.isWorking(in: botId) == true)
         VStack(spacing: 0) {
             ModalHeader("Full conversation")
             ScrollView {
@@ -33,7 +31,7 @@ public struct TraceView: View {
                             .foregroundStyle(Palette.text)
                             .padding(.leading, 4)
                         CardSection {
-                            ForEach(entries) { TraceRow(entry: $0) }
+                            ForEach(entries) { TraceRow(entry: $0, unfolded: turn == running) }
                         }
                     }
                 }
@@ -44,12 +42,24 @@ public struct TraceView: View {
             .defaultScrollAnchor(.bottom)
         }
         .background(Palette.background)
+        .tracked(.screenViewed(.trace))
+    }
+
+    /// The turn running now while the bot works in this chat; a queued message already holds the next turn.
+    nonisolated static func runningTurn(_ entries: [Entry], working: Bool) -> Int64? {
+        working ? entries.filter { $0.data.status != "queued" }.map(\.turn).max() : nil
     }
 }
 
 private struct TraceRow: View {
     let entry: Entry
-    @State private var expanded = false
+    @State private var expanded: Bool
+
+    /// The running turn's thoughts start unfolded, so its reasoning reads as it comes in.
+    init(entry: Entry, unfolded: Bool) {
+        self.entry = entry
+        _expanded = State(initialValue: unfolded)
+    }
 
     var body: some View {
         let d = entry.data
@@ -113,6 +123,15 @@ struct ToolRow: View {
         }
     }
 
+    private var orb: ThinkingOrb.State {
+        switch data.toolKind {
+        case "search": .searching
+        case "fetch": .connecting
+        case "edit": .shaping
+        default: .working
+        }
+    }
+
     private var hasBody: Bool {
         !(data.output ?? "").isEmpty || !(data.diffs ?? []).isEmpty
     }
@@ -138,7 +157,7 @@ struct ToolRow: View {
             switch data.status {
             case "completed": Image(systemName: "checkmark").foregroundStyle(Palette.accent)
             case "failed": Image(systemName: "xmark").foregroundStyle(Palette.danger)
-            default: ThinkingOrb(state: data.toolKind == "search" ? .searching : data.toolKind == "fetch" ? .connecting : .working, size: 16, color: Palette.secondary)
+            default: ThinkingOrb(state: orb, size: 16, color: Palette.secondary)
             }
         }
         .font(.caption)

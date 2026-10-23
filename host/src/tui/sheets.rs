@@ -13,12 +13,12 @@ pub use memory_view::draw as memory;
 
 use super::app::{App, Editor};
 use super::manage::{
-    AgentSetup, Fields, Market, RoutineField, RoutineForm, RoutineList, Row, SetupRow, Submit, TABS, Tab,
+    AgentSetup, Fields, Market, Page, RoutineField, RoutineForm, RoutineList, Row, SetupRow, Submit, TABS, Tab,
 };
 use super::md::truncate;
 use super::view::{
-    centered, composer_lines, field_line, frame_box, hline, input_line, put, restyle, rput, set_cursor, theme, u,
-    when_future,
+    centered, chain_line, composer_lines, field_line, frame_box, hline, input_line, put, restyle, rput, set_cursor,
+    theme, u, using_line, when_future,
 };
 
 fn s<'a>(v: &'a Value, k: &str) -> &'a str {
@@ -54,11 +54,62 @@ fn name_of(app: &App, bot: &str) -> String {
     app.bots.get(bot).map_or_else(String::new, |b| b.name.clone())
 }
 
+/// A bot's pages on the top line (Details, Memory, Settings) with this one marked; returns the
+/// area under it.
+pub fn page_tabs(buf: &mut Buffer, inner: Rect, current: Page) -> Rect {
+    let t = theme();
+    let mut x = inner.x;
+    for page in Page::ALL {
+        let style = if page == current { t.text.patch(t.sel) } else { t.secondary.patch(t.panel) };
+        x = put(buf, x, inner.y, inner.right().saturating_sub(x), &format!(" {} ", page.label()), style) + 1;
+    }
+    rput(buf, inner.right(), inner.y, "⇧←→ page", t.dim.patch(t.panel));
+    Rect::new(inner.x, inner.y + 2, inner.width, inner.height.saturating_sub(2))
+}
+
 pub fn routines(buf: &mut Buffer, area: Rect, app: &App, l: &RoutineList) {
     let t = theme();
-    let r = centered(area, 90, 24);
-    let title = format!("{}'s routines", name_of(app, &l.bot));
+    let r = centered(area, 90, 28);
+    let title = name_of(app, &l.bot);
     let inner = frame_box(buf, r, t.text, t.panel, Some((&title, t.text)));
+    let mut inner = page_tabs(buf, inner, Page::Details);
+    // What changes often: the agent, its model and the instructions (`i` edits them in Settings).
+    if let Some(b) = app.bots.get(&l.bot).filter(|b| !b.group) {
+        let agent = app
+            .backends
+            .iter()
+            .find(|x| x["id"].as_str() == Some(b.backend.as_str()))
+            .map_or(&*b.backend, |x| s(x, "name"));
+        let model = b.model.as_deref().unwrap_or("default model");
+        let fast = if b.fast_mode { " · fast" } else { "" };
+        put(buf, inner.x, inner.y, inner.width, &format!("{agent} · {model}{fast}"), t.text.patch(t.panel));
+        rput(buf, inner.right(), inner.y, "i edits", t.dim.patch(t.panel));
+        let mut line = inner.y + 1;
+        // The agent it's on when its own can't answer, and the chain.
+        if let Some(using) = using_line(app, b) {
+            put(buf, inner.x, line, inner.width, &using, t.amber.patch(t.panel));
+            rput(buf, inner.right(), line, "B switches back", t.dim.patch(t.panel));
+            line += 1;
+        }
+        if let Some(chain) = chain_line(app, b) {
+            let room = usize::from(inner.width);
+            put(buf, inner.x, line, inner.width, &truncate(&chain, room), t.secondary.patch(t.panel));
+            line += 1;
+        }
+        let first = b.description.lines().find(|l| !l.trim().is_empty()).unwrap_or("No standing instructions");
+        let room = usize::from(inner.width);
+        put(buf, inner.x, line, inner.width, &truncate(first.trim(), room), t.secondary.patch(t.panel));
+        let used = line + 2 - inner.y;
+        inner = Rect::new(inner.x, inner.y + used, inner.width, inner.height.saturating_sub(used));
+    }
+    if !app.screen.is_null() {
+        let on = app.bots.get(&l.bot).is_some_and(|b| b.computer);
+        put(buf, inner.x, inner.y, inner.width, "Use the computer", t.text.patch(t.panel));
+        let x = rput(buf, inner.right(), inner.y, "  u switches", t.dim.patch(t.panel));
+        rput(buf, x, inner.y, if on { "◉ On" } else { "○ Off" }, if on { t.text } else { t.secondary }.patch(t.panel));
+        inner = Rect::new(inner.x, inner.y + 2, inner.width, inner.height.saturating_sub(2));
+    }
+    put(buf, inner.x, inner.y, inner.width, "Routines", t.bold.patch(t.panel));
     let list_h = usize::from(inner.height.saturating_sub(3)) / 2;
     match &l.items {
         None => {
@@ -81,7 +132,15 @@ pub fn routines(buf: &mut Buffer, area: Rect, app: &App, l: &RoutineList) {
                 let on = it["enabled"] == true;
                 put(buf, inner.x, y, 2, if on { "●" } else { "○" }, if on { t.bold } else { t.dim }.patch(base));
                 put(buf, inner.x + 2, y, inner.width / 2, s(it, "name"), t.bold.patch(base));
-                let next = it["nextRunAt"].as_i64().map(|ms| format!("next {}", when_future(ms)));
+                // A retry still waiting comes before the schedule's next run.
+                let retry = l
+                    .runs
+                    .iter()
+                    .find(|r| r["routineId"] == it["id"] && r["status"] == "pending")
+                    .and_then(|r| r["notBefore"].as_i64());
+                let next = retry
+                    .map(|ms| format!("retry {}", when_future(ms)))
+                    .or_else(|| it["nextRunAt"].as_i64().map(|ms| format!("next {}", when_future(ms))));
                 rput(
                     buf,
                     inner.right(),
@@ -111,7 +170,7 @@ pub fn routines(buf: &mut Buffer, area: Rect, app: &App, l: &RoutineList) {
 
 pub fn routine(buf: &mut Buffer, area: Rect, f: &RoutineForm) {
     let t = theme();
-    let r = centered(area, 84, 14);
+    let r = centered(area, 84, 15);
     let title = if f.id.is_some() { "Edit routine" } else { "New routine" };
     let inner = frame_box(buf, r, t.text, t.panel, Some((title, t.text)));
     let label = |on: bool| if on { t.bold } else { t.secondary }.patch(t.panel);
@@ -130,19 +189,18 @@ pub fn routine(buf: &mut Buffer, area: Rect, f: &RoutineForm) {
     );
     put(buf, inner.x, inner.y + 7, 9, "When", label(f.field == RoutineField::When));
     let placeholder = if f.original_text.is_empty() {
-        "0 9 * * 1-5  ·  every 2h  ·  2026-10-01 09:00  ·  webhook"
+        "daily 09:00 · weekdays 09:00 · every 2h · 0 9 * * 1-5 · webhook"
     } else {
         &f.original_text
     };
     input_line(buf, at(inner.y + 7), inner.y + 7, &f.when, placeholder, f.field == RoutineField::When, false);
-    put(
-        buf,
-        vx,
-        inner.y + 8,
-        vw,
-        &format!("cron runs in {}; every = from now on; webhook = when called", super::manage::local_zone()),
-        t.dim.patch(t.panel),
-    );
+    put(buf, vx, inner.y + 8, vw, "or hourly :30 · weekly mon 09:00 · 2026-10-01 09:00 (once)", t.dim.patch(t.panel));
+    put(buf, vx, inner.y + 9, vw, "every = from now on · webhook = when called", t.dim.patch(t.panel));
+    let (zone_hint, zone_style) = match super::manage::complete_zone(&f.when.text, crate::store::now_ms()) {
+        Some(done) => (format!("tab → {done}"), t.secondary),
+        None => (format!("times in {}; end with a zone to change it", super::manage::local_zone()), t.dim),
+    };
+    put(buf, vx, inner.y + 10, vw, &zone_hint, zone_style.patch(t.panel));
     let by = inner.bottom() - 1;
     if let Some(e) = &f.error {
         put(buf, inner.x, by - 1, inner.width, e, t.red.patch(t.panel));
@@ -175,7 +233,7 @@ fn multiline(buf: &mut Buffer, r: Rect, e: &Editor, placeholder: &str, active: b
 pub fn market(buf: &mut Buffer, area: Rect, app: &App, m: &Market) {
     let t = theme();
     let r = centered(area, 96, 30);
-    let title = format!("Marketplace · {}", app.host);
+    let title = format!("Extensions · {}", app.host);
     let inner = frame_box(buf, r, t.text, t.panel, Some((&title, t.text)));
     let mut x = inner.x;
     for (tab, label) in TABS {
@@ -198,12 +256,19 @@ pub fn market(buf: &mut Buffer, area: Rect, app: &App, m: &Market) {
     for (i, item) in rows.iter().enumerate().skip(window(m.cursor, list_h)).take(list_h) {
         let base = row(buf, inner, y, i == m.cursor);
         let (mark, name, detail, right): (&str, String, String, String) = match item {
+            Row::Node => (
+                "+",
+                "Add Node.js".into(),
+                "Some agents need it to run. Codync adds a copy just for them.".into(),
+                String::new(),
+            ),
             Row::Agent(b) => {
                 let status = match (b["installed"] == true, b["signedIn"].as_bool()) {
+                    (false, _) if b["curated"] == true => "not installed",
+                    _ if b["node"] == "missing" => "needs Node.js",
                     (_, Some(true)) => "signed in",
                     (true, Some(false)) => "not signed in",
                     (true, None) => "installed",
-                    (false, _) if b["curated"] == true => "not installed",
                     (false, _) => "sets up on first use",
                 };
                 let mark = if b["signedIn"] == true || b["installed"] == true { "✓" } else { "↓" };
@@ -239,7 +304,7 @@ pub fn market(buf: &mut Buffer, area: Rect, app: &App, m: &Market) {
     let keys = match m.tab {
         Tab::Agents => "tab switch · ↵ install / sign in · ^r refresh · esc close",
         Tab::Connectors => "tab switch · ↵ add / sign in · ^x remove · ^r refresh · esc",
-        Tab::Skills => "tab switch · ↵ install · ^x remove · esc close",
+        Tab::Skills => "tab switch · ↵ details · ^x remove · esc close",
     };
     let loading = m.loading && m.tab == Tab::Connectors && !rows.is_empty();
     footer(buf, inner, m.error.as_deref().or(loading.then_some("Loading the registry…")), keys);
@@ -265,6 +330,8 @@ pub fn agent(buf: &mut Buffer, area: Rect, app: &App, a: &AgentSetup) {
         } else {
             "Working…".into()
         }
+    } else if signed_in != Some(true) && b.is_some_and(|b| b["node"] == "missing") {
+        "Add Node.js first.".into()
     } else {
         match signed_in {
             Some(true) => "Signed in.".into(),
@@ -289,6 +356,9 @@ pub fn agent(buf: &mut Buffer, area: Rect, app: &App, a: &AgentSetup) {
         let base = row(buf, inner, y, i == a.cursor);
         let (icon, title, detail) = match rw {
             SetupRow::Install => ("↓", "Install".to_owned(), format!("Runs the official installer on {}.", app.host)),
+            SetupRow::Node => {
+                ("↓", "Add Node.js".to_owned(), format!("{name} runs on Node.js. Codync adds its own copy."))
+            }
             SetupRow::Login => ("›_", "Sign in".to_owned(), format!("In a terminal on {}.", app.host)),
             SetupRow::Method(m) => {
                 let (icon, fallback) = match s(m, "kind") {
@@ -390,7 +460,7 @@ pub fn fields(buf: &mut Buffer, area: Rect, f: &Fields) {
     ) + 1;
     put(buf, x, by, 12, " esc Cancel ", t.text.patch(t.btn).add_modifier(Modifier::BOLD));
     let hint = if matches!(f.submit, Submit::Connection(_)) {
-        "^x cancel request · tab next · esc close"
+        "tab next · esc close"
     } else if tall {
         "⇧↵ new line · paste works"
     } else {

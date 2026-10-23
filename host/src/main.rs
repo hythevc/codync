@@ -140,10 +140,6 @@ enum Sub {
         /// Allow a manual update to interrupt active bots (their sessions resume).
         #[arg(long)]
         force: bool,
-        /// Install even if the App Store doesn't have the iPhone app this release needs yet
-        /// (paired iPhones then ask for an update they may not get until review is done).
-        #[arg(long)]
-        skip_app_check: bool,
         #[arg(long, default_value_t = service::DEFAULT_PORT)]
         port: u16,
         #[arg(long)]
@@ -151,7 +147,9 @@ enum Sub {
         #[arg(long, hide = true)]
         worker: bool,
     },
-    /// The versions this host works with (JSON), asked of a downloaded update before installing it.
+    /// The versions and environment of this host (JSON). The desktop app reads `environment`
+    /// from it before installing the host; hosts before 2.19.3 also read `minApp` from a
+    /// downloaded update.
     #[command(hide = true)]
     Compat,
     /// Show whether the host is installed and running.
@@ -181,6 +179,16 @@ enum Sub {
         #[arg(long, default_value_t = service::DEFAULT_PORT)]
         port: u16,
     },
+    /// npm on this computer's Node, else on Codync's own (downloaded first): what setup
+    /// terminals install npm CLIs with.
+    #[command(hide = true)]
+    Npm {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Add Codync's own Node.js, for agents that run on it (an agent's setup step).
+    #[command(hide = true)]
+    Node,
     /// Built-in MCP servers that bots are started with (stdio).
     #[command(hide = true)]
     Mcp {
@@ -244,6 +252,13 @@ enum McpServer {
         #[arg(long, default_value_t = service::DEFAULT_PORT)]
         port: u16,
     },
+    /// Create bots and change any bot's setup, for a bot that may manage the team.
+    Manage {
+        #[arg(long)]
+        bot: String,
+        #[arg(long, default_value_t = service::DEFAULT_PORT)]
+        port: u16,
+    },
     /// Search the bot's own chat history.
     Memory {
         #[arg(long)]
@@ -286,6 +301,8 @@ fn open_store() -> Result<(store::Store, String, String)> {
     } else {
         let v = uuid::Uuid::new_v4().to_string();
         store.kv_set("host_id", &v)?;
+        // A new install, whichever command made it: its first start is `host_started.first_run`.
+        store.kv_set(analytics::KV_STARTED, "")?;
         v
     };
     let token = match store.kv_get("token") {
@@ -392,7 +409,7 @@ async fn main() -> Result<()> {
             );
             Ok(())
         }
-        Sub::Update { check, status, auto, force, skip_app_check, port, json, worker } => {
+        Sub::Update { check, status, auto, force, port, json, worker } => {
             let status = if let Some(auto) = auto {
                 update::set_automatic(auto == "on")?
             } else if status {
@@ -400,10 +417,10 @@ async fn main() -> Result<()> {
             } else if check {
                 update::check().await?
             } else if !worker && service::installed() {
-                tokio::task::spawn_blocking(move || update::spawn_worker(port, force, skip_app_check)).await??;
+                tokio::task::spawn_blocking(move || update::spawn_worker(port, force)).await??;
                 update::status()?
             } else {
-                update::apply(port, force, skip_app_check, worker).await?
+                update::apply(port, force, worker).await?
             };
             if json {
                 println!("{}", serde_json::to_string_pretty(&status)?);
@@ -416,18 +433,6 @@ async fn main() -> Result<()> {
                 println!("Automatic updates: {}", if status["automatic"] == true { "on" } else { "off" });
                 if let Some(version) = status["state"]["availableVersion"].as_str() {
                     println!("Available version: {version}");
-                }
-                if let Some(required) = status["state"]["requiredApp"].as_str() {
-                    match status["state"]["appStoreVersion"].as_str() {
-                        Some(store) => println!(
-                            "Waiting for the iPhone app {required} (the App Store has {store}); \
-                             it installs once that passes review"
-                        ),
-                        None => println!(
-                            "Waiting for the iPhone app {required}: couldn't check the App Store. \
-                             `codync-host update --skip-app-check` installs anyway"
-                        ),
-                    }
                 }
                 if let Some(error) = status["state"]["error"].as_str() {
                     println!("Last error: {error}");
@@ -465,6 +470,8 @@ async fn main() -> Result<()> {
             );
             Ok(())
         }
+        Sub::Node => agent::node::add().await,
+        Sub::Npm { args } => std::process::exit(agent::node::npm(&args).await?),
         Sub::Statusline { port, wrapped } => {
             statusline(port, wrapped.join(" ")).await;
             Ok(())
@@ -482,6 +489,7 @@ async fn main() -> Result<()> {
         Sub::Mcp { server: McpServer::Routines { bot, port } } => mcp::serve(bot, port, mcp::Server::Routines).await,
         Sub::Mcp { server: McpServer::Chat { bot, port } } => mcp::serve(bot, port, mcp::Server::Chat).await,
         Sub::Mcp { server: McpServer::Team { bot, port } } => mcp::serve(bot, port, mcp::Server::Team).await,
+        Sub::Mcp { server: McpServer::Manage { bot, port } } => mcp::serve(bot, port, mcp::Server::Manage).await,
         Sub::Mcp { server: McpServer::Memory { bot, port } } => mcp::serve(bot, port, mcp::Server::Memory).await,
         Sub::Mcp { server: McpServer::Composio { bot, port } } => mcp::serve(bot, port, mcp::Server::Composio).await,
         Sub::Mcp { server: McpServer::Local { connector, port } } => mcp::serve_local(connector, port).await,
@@ -513,6 +521,9 @@ async fn serve(bind: &str, port: u16) -> Result<()> {
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "codync_host=info".into()),
         )
+        // A failed log write would be reported with `eprintln!`, which panics when stderr is gone
+        // too (a closed terminal, a full disk): a log line must never take a task down.
+        .log_internal_errors(false)
         .init();
     let (store, host_id, token) = open_store()?;
     write_token_file(&token)?;
@@ -520,6 +531,7 @@ async fn serve(bind: &str, port: u16) -> Result<()> {
     tokio::task::spawn_blocking(backends::hydrate_path).await?;
     let hub = hub::Hub::new(store, host_id, identity, token, port);
     hub.start()?;
+    analytics::host_started(&hub, service::started_by_service());
     background::start(&hub);
     tracing::info!(version = env!("CARGO_PKG_VERSION"), bind, port, "codync-host listening");
     // Peer addresses: some settings may only be changed from this computer.
@@ -533,6 +545,8 @@ async fn serve(bind: &str, port: u16) -> Result<()> {
         () = shutdown_signal() => {},
     }
     hub.shutdown().await;
+    agent::acp::stopped().await;
+    analytics::flush_before_exit(&hub).await;
     tracing::info!("codync-host stopped");
     Ok(())
 }
@@ -606,7 +620,9 @@ async fn pair(port: u16, as_json: bool) -> Result<()> {
     println!("Scan with the Codync iOS app within 10 minutes, or open this link on the phone:\n{url}\n");
     if hello["cloud"].is_null()
         && p["urls"].as_array().is_none_or(|u| {
-            !u.iter().any(|u| u.as_str().is_some_and(|u| u.contains("://100.") || u.contains(".ts.net")))
+            !u.iter().any(|u| {
+                u.as_str().is_some_and(|u| u.contains("://100.") || u.contains(".ts.net") || u.starts_with("https://"))
+            })
         })
     {
         println!(

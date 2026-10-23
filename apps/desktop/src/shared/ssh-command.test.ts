@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { infoArguments, remoteInfoCommand, resolveArguments, tunnelArguments } from '../main/ssh-command.ts'
+import { infoArguments, orphanTunnelPattern, remoteInfoCommand, resolveArguments, tunnelArguments } from '../main/ssh-command.ts'
 import type { SSHProfile } from './ssh.ts'
 
 // Remap absolute installation directories into an isolated filesystem fixture. Run the
@@ -16,7 +16,6 @@ const locations = [
   '/home/linuxbrew/.linuxbrew/bin',
   '/user home/.local/bin',
   '/Applications/Codync.app/Contents/Resources',
-  '/Applications/Codync.app/Contents/MacOS',
 ]
 
 function probe(installed: string[]) {
@@ -168,7 +167,6 @@ for (const kind of ['info', 'tunnel', 'resolve'] as const) {
 
 for (const [preferred, fallback] of [
   ['/opt/homebrew/bin', '/Applications/Codync.app/Contents/Resources'],
-  ['/Applications/Codync.app/Contents/Resources', '/Applications/Codync.app/Contents/MacOS'],
 ]) {
   test(`SSH prefers ${preferred} over ${fallback}`, { skip: process.platform === 'win32' }, () => {
     const result = probe([preferred, fallback])
@@ -176,3 +174,12 @@ for (const [preferred, fallback] of [
     assert.equal(result.lines[0], join(result.root, preferred, 'codync-host'))
   })
 }
+
+test('each copy of the app clears only its own leftover tunnels', () => {
+  const tunnel = (dir: string) => ['/usr/bin/ssh', ...tunnelArguments(profile, 19333, '/Users/me', dir)].join(' ')
+  const dev = new RegExp(orphanTunnelPattern('/Users/me/.codync-dev'))
+  assert.match(tunnel('/Users/me/.codync-dev'), dev)
+  assert.doesNotMatch(tunnel('/Users/me/.codync-dev-feat-x'), dev)
+  assert.doesNotMatch(tunnel('/Users/me/xcodync-dev'), dev)
+  assert.doesNotMatch(tunnel('/Users/me/.codync-dev'), new RegExp(orphanTunnelPattern('/Users/me/.codync-dev-feat-x')))
+})

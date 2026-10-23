@@ -6,15 +6,23 @@
 #![allow(clippy::many_single_char_names)]
 
 mod agent;
+mod analytics;
 mod bot_chat;
 mod fields;
 mod market;
 mod memory;
+mod pages;
 mod replies;
 mod routines;
+mod skill;
+mod when;
 
-pub use memory::{MemoryMode, MemorySheet};
-pub use routines::local_zone;
+pub use analytics::AnalyticsSheet;
+pub use fields::handoff_fields;
+pub use memory::{MemoryMode, MemorySheet, Scroll, Section};
+pub use pages::Page;
+pub use skill::SkillSheet;
+pub use when::{complete_zone, local_zone};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde_json::{Value, json};
@@ -31,8 +39,8 @@ pub const REACTIONS: [&str; 6] = ["👍", "❤️", "😂", "🎉", "👀", "✅
 pub enum Reply {
     Memory(String),
     MemorySaved(String),
-    MemoryDetail(String),
-    MemoryExport(String),
+    /// A note the bot's memory sheet has open.
+    MemoryFile(String),
     Routines(String),
     RoutineSaved,
     /// A routine's webhook URL and key: copied as a ready-to-run curl.
@@ -46,6 +54,8 @@ pub enum Reply {
         more: bool,
     },
     Skills,
+    /// A skill's instructions, for the details sheet with that id.
+    SkillDetails(String),
     Auth(String),
     Setup,
     FieldsSaved,
@@ -72,6 +82,8 @@ pub struct BotChatSheet {
 pub struct RoutineList {
     pub bot: String,
     pub items: Option<Vec<Value>>,
+    /// The bot's runs, newest first.
+    pub runs: Vec<Value>,
     pub cursor: usize,
 }
 
@@ -119,6 +131,8 @@ pub struct Market {
 }
 
 pub enum Row<'a> {
+    /// Some agents run on Node.js and the computer has none: adds Codync's copy.
+    Node,
     Agent(&'a Value),
     Installed(&'a Value),
     Custom,
@@ -139,6 +153,7 @@ pub struct AgentSetup {
 
 pub enum SetupRow {
     Install,
+    Node,
     Login,
     Method(Value),
     Check,
@@ -159,6 +174,8 @@ pub enum Submit {
     Connection(Box<super::connections::Connection>),
     Connector(Value),
     Import,
+    /// A handoff card's text (the card's entry id).
+    Handoff(String),
 }
 
 /// A few labeled text fields: an agent's keys, a connector's setup, a pasted MCP config.
@@ -267,9 +284,15 @@ impl App {
     pub(super) fn cycle_model(&self, backend: &str, current: &str, d: isize) -> Option<String> {
         let list = self.models.get(backend)?.as_ref()?;
         let mut ids = vec![String::new()];
-        ids.extend(list.iter().map(|(id, _)| id.clone()));
+        ids.extend(list.iter().map(|m| m.id.clone()));
         let i = ids.iter().position(|x| x == current).unwrap_or(0);
         Some(ids[super::app::cycle(i, d, ids.len())].clone())
+    }
+
+    /// The settings (effort, fast…) `backend`'s `model` offers.
+    pub(crate) fn model_settings(&self, backend: &str, model: &str) -> &[super::app::ModelOption] {
+        let list = self.models.get(backend).and_then(Option::as_ref);
+        list.and_then(|l| l.iter().find(|m| m.id == model)).map_or(&[], |m| &m.options)
     }
 }
 

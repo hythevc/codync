@@ -24,7 +24,7 @@ struct RootView: View {
                     WelcomeView { withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { welcomed = true } }
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 } else {
-                    PairingView(onSkip: { onboardingCompleted = true }) {
+                    PairingView(onSkip: { completeOnboarding(via: .skipped) }) {
                         if account.isSignedIn {
                             AccountSwitcherButton()
                         } else {
@@ -41,7 +41,7 @@ struct RootView: View {
         .onChange(of: accounts.computers.isEmpty && accounts.cloudComputers.isEmpty, initial: true) { _, empty in
             // Pairing, signing in to an account that has computers, or explicitly skipping completes
             // setup. Keep this device-level milestone across account changes and unpairing.
-            if !empty { onboardingCompleted = true }
+            if !empty { completeOnboarding(via: accounts.cloudComputers.isEmpty ? .paired : .account) }
         }
         .codyncDialog("Something went wrong", isPresented: errorShown, message: errorMessage, cancel: "OK", inPlace: true) { [] }
         .codyncOverlay(isPresented: Binding(get: { screenTarget.wrappedValue != nil }, set: { if !$0 { screenTarget.wrappedValue = nil } })) { close in
@@ -69,34 +69,35 @@ struct RootView: View {
         }
     }
 
-    /// Both tab stacks stay alive (scroll position, open thread); the tab bar hides while a thread is open.
+    /// The system tab bar; both tabs stay alive (scroll position, open thread) and the bar hides while a
+    /// thread is open.
     private var tabs: some View {
-        ZStack {
-            NavigationStack(path: path) {
-                BotListView()
-                    .navigationDestination(for: BotReference.self) { ref in ChatScreen(ref: ref) }
-            }
-            .tabLayer(app.tab == .bots)
-            StateTab()
-                .tabLayer(app.tab == .state)
-        }
-        .animation(Motion.reduced(Motion.fade, reduceMotion), value: app.tab)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if accounts.selection == nil {
-                VStack(spacing: 8) {
-                    AccessBanners()
-                    TabBar(selection: Bindable(app).tab, tabs: [
-                        (id: AppTab.bots, title: "Bots", icon: "bubble.left.and.bubble.right.fill"),
-                        (id: AppTab.state, title: "State", icon: "rectangle.stack.fill"),
-                    ])
-                    .padding(.bottom, 4)
+        TabView(selection: Bindable(app).tab) {
+            Tab("Bots", systemImage: "bubble.left.and.bubble.right.fill", value: AppTab.bots) {
+                NavigationStack(path: path) {
+                    BotListView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
+                        .navigationDestination(for: BotReference.self) { ref in
+                            ChatScreen(ref: ref).toolbar(.hidden, for: .tabBar)
+                        }
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+            Tab("State", systemImage: "rectangle.stack.fill", value: AppTab.state) {
+                StateTab()
+                    .safeAreaInset(edge: .bottom, spacing: 0) { AccessBanners() }
             }
         }
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: accounts.selection == nil)
+        .tint(Palette.text)
+        .tracked(.screenViewed(app.tab == .bots ? .bots : .state))
         // Opening a bot (notification, widget, link) always lands on the Bots tab.
         .onChange(of: accounts.selection) { _, ref in if ref != nil { app.tab = .bots } }
+    }
+
+    /// Once per setup (Start over begins a new one): the first computer reached, or Skip.
+    private func completeOnboarding(via: AnalyticsEvent.OnboardingVia) {
+        guard !onboardingCompleted else { return }
+        onboardingCompleted = true
+        Analytics.shared.capture(.onboardingCompleted(via: via))
     }
 
     // MARK: one place for every computer's errors and screen requests
@@ -244,6 +245,7 @@ private struct UsageSheet: View {
             }
         }
         .background(Palette.background)
+        .tracked(.screenViewed(.usage))
     }
 }
 
@@ -321,7 +323,7 @@ private extension View {
     }
 }
 
-/// Account computers this iPhone asked on its own after sign-in: the code to check, until they answer.
+/// Access requests still waiting after their sheet closed: the code to check, until the computer answers.
 private struct AccessBanners: View {
     @Environment(AccountStore.self) private var accounts
 
@@ -349,6 +351,7 @@ private struct AccessBanners: View {
             }
         }
         .padding(.horizontal, 16)
+        .padding(.bottom, accounts.pendingAccess.isEmpty ? 0 : 8)
         .animation(Motion.layout, value: accounts.pendingAccess.keys.sorted())
         .accessibilityElement(children: .contain)
     }

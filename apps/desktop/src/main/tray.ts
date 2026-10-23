@@ -1,10 +1,14 @@
 import { join } from 'node:path'
 import { app, clipboard, Menu, nativeImage, shell, Tray as ElectronTray } from 'electron'
-import type { TraySummary, WindowCommand } from '../shared/ipc'
+import type { TrayImage, TraySummary, WindowCommand } from '../shared/ipc'
 import type { HostController } from './host-controller'
 import type { Updates } from './updates'
+import { updateAction } from '../shared/update-action'
 import { setShowInDock, showInDock } from './dock'
 import { identity } from './environment'
+import { islandSupported, type Island } from './island'
+import { islandLabel } from '../shared/island'
+import { launchAtLogin, setLaunchAtLogin } from './login-item'
 
 interface Deps {
   openChat: () => unknown
@@ -12,6 +16,7 @@ interface Deps {
   send: (command: WindowCommand, show?: boolean) => void
   host: HostController
   updates: Updates
+  island: Island
 }
 
 const resources = () => (app.isPackaged ? process.resourcesPath : join(__dirname, '../../resources'))
@@ -21,7 +26,7 @@ const TEXT_SIZES = [11, 12, 13, 14, 15, 16, 18]
 export class Tray {
   private tray: ElectronTray
   private summary: TraySummary | null = null
-  private launchAtLogin = app.getLoginItemSettings().openAtLogin
+  private launchAtLogin = launchAtLogin()
 
   constructor(private deps: Deps) {
     this.tray = new ElectronTray(this.icon(false))
@@ -50,11 +55,12 @@ export class Tray {
     this.rebuild()
   }
 
-  /** The renderer draws menu images at 2× (`tray-summary.ts`): shown at half their pixel size. */
-  private image(dataURL: string | null) {
-    if (!dataURL) return undefined
+  /** The renderer draws menu images at 1× and 2× (`tray-summary.ts`): each screen gets its own pixels. */
+  private image(drawn: TrayImage | null) {
+    if (!drawn) return undefined
     const image = nativeImage.createEmpty()
-    image.addRepresentation({ scaleFactor: 2, dataURL })
+    image.addRepresentation({ scaleFactor: 1, dataURL: drawn.x1 })
+    image.addRepresentation({ scaleFactor: 2, dataURL: drawn.x2 })
     return image.isEmpty() ? undefined : image
   }
 
@@ -156,14 +162,10 @@ export class Tray {
     const { updates } = this.deps
     const u = updates.state
     const items: Electron.MenuItemConstructorOptions[] = [
-      { label: u.availableVersion ? `Update to ${u.availableVersion}…` : 'Check for Updates…', enabled: u.canCheck || u.staged, click: () => updates.check() },
-    ]
-    // The release waits until paired iPhones can get the app it needs.
-    if (u.waitingForApp) items.push({ label: `Waiting for iPhone app ${u.waitingForApp} to pass App Store review`, enabled: false })
-    items.push(
+      { ...updateAction(u), click: () => updates.check() },
       { label: 'Automatically check for updates', type: 'checkbox', checked: u.autoCheck, enabled: u.supported, click: () => updates.emit('setAutoCheck', !u.autoCheck) },
       { label: 'Automatically download and install', type: 'checkbox', checked: u.autoDownload, enabled: u.supported, click: () => updates.emit('setAutoDownload', !u.autoDownload) },
-    )
+    ]
     if (!u.supported) items.push({ label: 'Updates are available in release builds.', enabled: false })
     if (u.lastCheck) items.push({ label: `Last checked: ${new Date(u.lastCheck).toLocaleString()}`, enabled: false })
     if (u.error) {
@@ -174,7 +176,7 @@ export class Tray {
   }
 
   private settingsMenu(): Electron.MenuItemConstructorOptions[] {
-    const { host, send } = this.deps
+    const { host, send, island } = this.deps
     const s = this.summary
     const style = s?.usageIconStyle ?? 'character'
     const size = s?.textSize ?? 12
@@ -200,12 +202,12 @@ export class Tray {
         type: 'checkbox',
         checked: this.launchAtLogin,
         click: () => {
-          app.setLoginItemSettings({ openAtLogin: !this.launchAtLogin })
-          this.launchAtLogin = app.getLoginItemSettings().openAtLogin
+          this.launchAtLogin = setLaunchAtLogin(!this.launchAtLogin)
           this.rebuild()
         },
       },
       ...(process.platform === 'darwin' ? [{ label: 'Show in Dock', type: 'checkbox' as const, checked: showInDock(), click: () => { setShowInDock(!showInDock()); this.rebuild() } }] : []),
+      ...(islandSupported ? [{ label: islandLabel(process.platform), type: 'checkbox' as const, checked: island.enabled, click: () => island.setEnabled(!island.enabled) }] : []),
       { type: 'separator' },
       { label: 'Updates', submenu: this.updatesMenu() },
       { type: 'separator' },

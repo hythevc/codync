@@ -3,18 +3,25 @@
 //! newer adapter adding a variant never breaks parsing.
 
 use crate::LockExt;
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use serde_json::{Value, json};
 use std::collections::{HashMap, VecDeque};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::Instant;
 
 /// stderr lines kept to explain a crash.
 const STDERR_TAIL_LINES: usize = 12;
+/// How long a stopped agent gets to exit by itself before what's left of it is killed.
+const EXIT_GRACE: Duration = Duration::from_secs(10);
+
+/// Agents [`Acp::kill`] is still stopping, for the host to wait for before it exits.
+static STOPPING: std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>> = std::sync::Mutex::new(Vec::new());
 
 pub enum Incoming {
     Notification { method: String, params: Value },
@@ -30,10 +37,16 @@ type Pending = Arc<std::sync::Mutex<HashMap<i64, oneshot::Sender<Result<Value, V
 pub struct RpcError {
     pub code: i64,
     pub message: String,
+    /// The adapter's own category (`data.errorKind`: Claude's `rate_limit`, `overloaded`, …; codex-acp's
+    /// `data.codexErrorInfo` as `usage_limit_exceeded`), kept only when it's an identifier, as it can go to usage
+    /// analytics.
+    pub kind: Option<String>,
 }
 
 /// ACP's "authentication required".
 pub const AUTH_REQUIRED: i64 = -32000;
+/// JSON-RPC's "internal error".
+pub const INTERNAL_ERROR: i64 = -32603;
 
 impl std::fmt::Display for RpcError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -43,9 +56,58 @@ impl std::fmt::Display for RpcError {
 
 impl std::error::Error for RpcError {}
 
+/// Whether an agent's error asks for signing in: ACP's code, or adapters that only say so.
+pub fn needs_sign_in(e: &anyhow::Error) -> bool {
+    let rpc = |c: &(dyn std::error::Error + 'static)| {
+        c.downcast_ref::<RpcError>()
+            .is_some_and(|r| r.code == AUTH_REQUIRED || r.message.to_lowercase().contains("auth"))
+    };
+    e.chain().any(rpc) || e.to_string().to_lowercase().contains("auth")
+}
+
+/// Whether a failed prompt may have left its session dead in the agent: an internal error the
+/// adapter gave no category. Claude's adapter answers every later prompt on a session whose query
+/// stream ended with one ("The Claude Agent session has ended") until the session is closed.
+pub fn may_end_session(e: &anyhow::Error) -> bool {
+    e.chain().filter_map(|c| c.downcast_ref::<RpcError>()).any(|r| r.code == INTERNAL_ERROR && r.kind.is_none())
+}
+
+/// A way an agent fails that the host itself recognizes, kept as a type so usage
+/// analytics can count it (`turn_finished.error`) without its text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailureKind {
+    /// No way to start the agent on this computer.
+    NotSetUp,
+    /// The agent stopped answering.
+    Timeout,
+    /// The agent process went away mid-request.
+    Exited,
+    /// The agent wouldn't take the bot's model.
+    NoModel,
+}
+
+#[derive(Debug)]
+pub struct Failure {
+    pub kind: FailureKind,
+    message: String,
+}
+
+impl Failure {
+    pub fn error(kind: FailureKind, message: impl Into<String>) -> anyhow::Error {
+        Self { kind, message: message.into() }.into()
+    }
+}
+
+impl std::fmt::Display for Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for Failure {}
+
 /// A request already written to the agent, waiting for its response.
 pub struct Answer {
-    method: String,
     rx: oneshot::Receiver<std::result::Result<Value, Value>>,
 }
 
@@ -59,18 +121,44 @@ impl Answer {
                     Some(d) => format!("{msg} ({d})"),
                     None => msg,
                 };
-                Err(RpcError { code: e["code"].as_i64().unwrap_or_default(), message }.into())
+                let kind = e["data"]["errorKind"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .or_else(|| codex_kind(&e["data"]["codexErrorInfo"]))
+                    .filter(|k| {
+                        !k.is_empty() && k.len() <= 40 && k.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+                    });
+                Err(RpcError { code: e["code"].as_i64().unwrap_or_default(), message, kind }.into())
             }
-            Err(_) => bail!("{}: connection closed", self.method),
+            // The reader drops every waiter when the process goes away.
+            Err(_) => Err(Failure::error(FailureKind::Exited, "agent process exited")),
         }
     }
 }
 
+/// codex-acp's category (`data.codexErrorInfo`: `"usageLimitExceeded"`, or `{"httpConnectionFailed": {…}}`) in the
+/// same form as Claude's `errorKind`: `usage_limit_exceeded`.
+fn codex_kind(info: &Value) -> Option<String> {
+    let name = info.as_str().or_else(|| info.as_object().and_then(|o| o.keys().next()).map(String::as_str))?;
+    let mut kind = String::with_capacity(name.len() + 4);
+    for c in name.chars() {
+        if c.is_ascii_uppercase() {
+            kind.push('_');
+        }
+        kind.push(c.to_ascii_lowercase());
+    }
+    Some(kind)
+}
+
 pub struct Acp {
-    stdin: tokio::sync::Mutex<ChildStdin>,
+    /// `None` once stopped: the closed pipe tells the agent to exit.
+    stdin: tokio::sync::Mutex<Option<ChildStdin>>,
     next_id: AtomicI64,
     pending: Pending,
-    child: tokio::sync::Mutex<Child>,
+    /// `None` once stopped (handed to [`reap`]).
+    child: tokio::sync::Mutex<Option<Child>>,
+    /// The process (and, on Unix, process group) leader.
+    pid: Option<u32>,
 }
 
 impl Acp {
@@ -148,28 +236,33 @@ impl Acp {
                         _ => {}
                     }
                 }
-                // Process gone: fail everyone still waiting.
-                for (_, w) in pending.locked().drain() {
-                    let _ = w.send(Err(json!({"message": "agent process exited"})));
-                }
+                // Process gone: dropping the waiters fails them as `FailureKind::Exited`.
+                pending.locked().clear();
                 let stderr_tail = tail.locked().iter().cloned().collect::<Vec<_>>().join("\n");
                 let _ = tx.send(Incoming::Closed { stderr_tail });
             });
         }
 
+        let pid = child.id();
         let acp = Arc::new(Self {
-            stdin: tokio::sync::Mutex::new(stdin),
+            stdin: tokio::sync::Mutex::new(Some(stdin)),
             next_id: AtomicI64::new(1),
             pending,
-            child: tokio::sync::Mutex::new(child),
+            child: tokio::sync::Mutex::new(Some(child)),
+            pid,
         });
         Ok((acp, rx))
+    }
+
+    pub fn pid(&self) -> Option<u32> {
+        self.pid
     }
 
     async fn write(&self, msg: Value) -> Result<()> {
         let mut line = serde_json::to_vec(&msg)?;
         line.push(b'\n');
         let mut stdin = self.stdin.lock().await;
+        let stdin = stdin.as_mut().ok_or_else(|| Failure::error(FailureKind::Exited, "agent stopped"))?;
         stdin.write_all(&line).await?;
         stdin.flush().await?;
         Ok(())
@@ -186,7 +279,7 @@ impl Acp {
         let (tx, rx) = oneshot::channel();
         self.pending.locked().insert(id, tx);
         self.write(json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params})).await?;
-        Ok(Answer { method: method.to_owned(), rx })
+        Ok(Answer { rx })
     }
 
     pub async fn notify(&self, method: &str, params: Value) -> Result<()> {
@@ -201,29 +294,69 @@ impl Acp {
         self.write(json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}})).await
     }
 
+    /// Stops the agent and everything it started, without waiting for it. Closing its stdin
+    /// lets it exit by itself first: Claude Code killed during an OAuth refresh loses the new
+    /// refresh token, and the user's login with it.
     pub async fn kill(&self) {
-        let mut child = self.child.lock().await;
-        // ACP adapters spawn MCP servers and tools. Stop the adapter's whole
-        // process group (Windows: process tree) before reaping its leader.
-        if let Some(pid) = child.id() {
-            let mut tree = if cfg!(windows) {
-                let mut c = Command::new("taskkill");
-                c.args(["/T", "/F", "/PID", &pid.to_string()]);
-                c
-            } else {
-                let mut c = Command::new("/bin/kill");
-                c.args(["-KILL", "--", &format!("-{pid}")]);
-                c
-            };
-            let _ = tree.stdout(Stdio::null()).stderr(Stdio::null()).status().await;
-        }
-        // Already exited is fine; anything else is worth a log line.
-        if let Err(error) = child.kill().await
-            && error.kind() != std::io::ErrorKind::InvalidInput
-        {
-            tracing::debug!(%error, "couldn't kill agent process");
+        self.stdin.lock().await.take();
+        if let Some(child) = self.child.lock().await.take() {
+            let mut stopping = STOPPING.locked();
+            stopping.retain(|task| !task.is_finished());
+            stopping.push(tokio::spawn(reap(child)));
         }
     }
+}
+
+/// Waits until every agent being stopped has exited or been killed (at most [`EXIT_GRACE`]).
+pub async fn stopped() {
+    let tasks = std::mem::take(&mut *STOPPING.locked());
+    futures::future::join_all(tasks).await;
+}
+
+/// Gives the agent [`EXIT_GRACE`] to exit with everything it started (ACP adapters spawn
+/// CLIs, MCP servers and tools), then kills its process group (Windows: process tree).
+async fn reap(mut child: Child) {
+    let Some(pid) = child.id() else { return };
+    let deadline = Instant::now() + EXIT_GRACE;
+    let exited = tokio::time::timeout_at(deadline, child.wait()).await.is_ok();
+    if !exited || outlived(pid, deadline).await {
+        let mut tree = if cfg!(windows) {
+            let mut c = Command::new("taskkill");
+            c.args(["/T", "/F", "/PID", &pid.to_string()]);
+            c
+        } else {
+            let mut c = Command::new("/bin/kill");
+            c.args(["-KILL", "--", &format!("-{pid}")]);
+            c
+        };
+        let _ = tree.stdout(Stdio::null()).stderr(Stdio::null()).status().await;
+    }
+    // Already exited is fine; anything else is worth a log line.
+    if let Err(error) = child.kill().await
+        && error.kind() != std::io::ErrorKind::InvalidInput
+    {
+        tracing::debug!(%error, "couldn't kill agent process");
+    }
+}
+
+/// Whether part of the exited agent's process group is still running at `deadline`.
+#[cfg(unix)]
+async fn outlived(pid: u32, deadline: Instant) -> bool {
+    let Ok(group) = libc::pid_t::try_from(pid) else { return true };
+    // SAFETY: signal 0 sends nothing; it only checks that the group still has a process.
+    let running = || unsafe { libc::killpg(group, 0) } == 0;
+    while running() && Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    running()
+}
+
+/// Windows has no process groups: what the agent started got the same closed pipes, and its
+/// tree can't be found once it's gone.
+#[cfg(windows)]
+#[allow(clippy::unused_async)] // the Unix check's signature
+async fn outlived(_pid: u32, _deadline: Instant) -> bool {
+    false
 }
 
 /// Plain-text rendering of an ACP content block list / tool-call content list.
@@ -269,6 +402,28 @@ mod tests {
         assert_eq!(truncate("héllo", 2), "h…");
     }
 
+    #[tokio::test]
+    async fn an_error_keeps_the_adapters_category_only_when_it_is_an_identifier() {
+        let kind = |data: Value| async move {
+            let (tx, rx) = oneshot::channel();
+            let _ = tx.send(Err(json!({"code": -32603, "message": "Internal error", "data": data})));
+            let e = Answer { rx }.response().await.expect_err("an error answer");
+            e.downcast::<RpcError>().expect("an RpcError").kind
+        };
+        assert_eq!(kind(json!({"errorKind": "rate_limit"})).await.as_deref(), Some("rate_limit"));
+        assert_eq!(kind(json!({"errorKind": "Usage: /Users/me"})).await, None);
+        assert_eq!(kind(json!({"errorKind": ""})).await, None);
+        assert_eq!(kind(json!("details")).await, None);
+        assert_eq!(
+            kind(json!({"codexErrorInfo": "usageLimitExceeded"})).await.as_deref(),
+            Some("usage_limit_exceeded")
+        );
+        assert_eq!(
+            kind(json!({"codexErrorInfo": {"httpConnectionFailed": {"httpStatusCode": 502}}})).await.as_deref(),
+            Some("http_connection_failed")
+        );
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn stopping_an_agent_closes_its_descendants_pipes() {
@@ -278,12 +433,28 @@ mod tests {
             &[],
         )
         .unwrap();
-        let ready = tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv()).await.unwrap();
+        let ready = tokio::time::timeout(Duration::from_secs(3), rx.recv()).await.unwrap();
         assert!(matches!(ready, Some(Incoming::Notification { .. })));
         acp.kill().await;
         // Killing only the shell leaves sleep holding stdout for 60 seconds.
-        let closed = tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv()).await.unwrap();
+        let closed = tokio::time::timeout(EXIT_GRACE + Duration::from_secs(3), rx.recv()).await.unwrap();
         assert!(matches!(closed, Some(Incoming::Closed { .. })));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_stopped_agent_finishes_by_itself_first() {
+        // The adapter exits on its closed stdin; the CLI it started saves its login a second later.
+        let (acp, mut rx) = Acp::spawn(
+            r#"sh -c 'read line; (sleep 1; echo "{\"jsonrpc\":\"2.0\",\"method\":\"saved\"}") &'"#,
+            "/tmp",
+            &[],
+        )
+        .unwrap();
+        acp.kill().await;
+        let saved = tokio::time::timeout(EXIT_GRACE, rx.recv()).await.unwrap();
+        assert!(matches!(saved, Some(Incoming::Notification { method, .. }) if method == "saved"));
+        assert!(acp.notify("x", json!({})).await.is_err(), "a stopped agent takes no more messages");
     }
 
     #[cfg(unix)]

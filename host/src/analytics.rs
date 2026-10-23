@@ -1,18 +1,30 @@
-//! Opt-in product analytics (`PostHog`), decided once per computer by its owner
-//! (`setAnalytics`; nothing is sent until then). Events name the feature that was used
-//! and never carry content: no message text, prompts, file names, paths or bot names.
+//! Product analytics (`PostHog`), on unless the computer's owner turned it off
+//! (`setAnalytics`). Events name the feature that was used and never carry content:
+//! no message text, prompts, file names, paths or bot names.
 //! What is collected and why: docs/features/analytics.md.
 
 use crate::LockExt as _;
-use crate::api::devices::Caller;
 use crate::hub::Hub;
 use crate::store::Store;
 use anyhow::Result;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::sync::mpsc;
+use std::time::{Duration, SystemTime};
+use tokio::sync::{mpsc, oneshot};
+
+pub mod errors;
+mod lifecycle;
+mod observe;
+pub mod reported;
+mod session;
+mod turns;
+
+pub use lifecycle::{KV_STARTED, Via, device_paired, host_started, phone_connected};
+pub use observe::{answered, observe_call};
+pub use reported::track;
+pub use turns::{TurnOutcome, TurnSource, agent_fell_back, turn_finished};
 
 const KV_ENABLED: &str = "analytics_enabled";
 /// The account the install id was last merged into (one `$identify` per account).
@@ -24,157 +36,185 @@ const FLUSH_EVERY: Duration = Duration::from_secs(30);
 /// Unsent events kept while offline; the oldest go first.
 const MAX_PENDING: usize = 500;
 
-/// Everything the host reports. Names follow the `object_verb` convention.
+/// Everything the host reports. Names follow the `object_verb` convention; each event's
+/// sender and properties: docs/reference/analytics-events.md.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
     AppOpened,
+    WindowOpened,
+    HostStarted,
     OnboardingCompleted,
+    ComputerAccessFinished,
+    SignInStarted,
+    SignInFailed,
     SignedIn,
     SignedOut,
+    PairingCodeCreated,
+    DevicePaired,
+    AccessRequestDenied,
+    DeviceRevoked,
+    PhoneConnected,
+    StarPromptAnswered,
+    LinkOpened,
+    ScreenViewed,
     BotCreated,
     BotUpdated,
+    BotsReordered,
     BotDeleted,
     MessageSent,
     TurnStopped,
+    TurnFinished,
+    /// A turn moved on to the bot's next agent (`agent::fallback`).
+    AgentFellBack,
     SessionReset,
     PermissionAnswered,
+    ReactionAdded,
+    HandoffAnswered,
     RoutineSaved,
+    RoutineToggled,
     RoutineDeleted,
     RoutineRun,
+    RoutineRetried,
+    VoiceCallStarted,
     VoiceCallFinished,
     RemoteScreenOpened,
+    ScreenTakenOver,
     ConnectorInstalled,
+    ConnectorsImported,
+    ConnectorRemoved,
+    ConnectorSigninStarted,
     SkillInstalled,
+    SkillRemoved,
+    SkillWritten,
+    CredentialSaved,
+    AgentSetupStarted,
+    AgentSignedIn,
+    SettingChanged,
+    HostUpdateInstalled,
+    /// Error tracking (`errors`): a panic or an uncaught error.
+    Exception,
 }
 
 impl Event {
     fn name(self) -> &'static str {
         match self {
             Self::AppOpened => "app_opened",
+            Self::WindowOpened => "window_opened",
+            Self::HostStarted => "host_started",
             Self::OnboardingCompleted => "onboarding_completed",
+            Self::ComputerAccessFinished => "computer_access_finished",
+            Self::SignInStarted => "sign_in_started",
+            Self::SignInFailed => "sign_in_failed",
             Self::SignedIn => "signed_in",
             Self::SignedOut => "signed_out",
+            Self::PairingCodeCreated => "pairing_code_created",
+            Self::DevicePaired => "device_paired",
+            Self::AccessRequestDenied => "access_request_denied",
+            Self::DeviceRevoked => "device_revoked",
+            Self::PhoneConnected => "phone_connected",
+            Self::StarPromptAnswered => "star_prompt_answered",
+            Self::LinkOpened => "link_opened",
+            Self::ScreenViewed => "screen_viewed",
             Self::BotCreated => "bot_created",
             Self::BotUpdated => "bot_updated",
+            Self::BotsReordered => "bots_reordered",
             Self::BotDeleted => "bot_deleted",
             Self::MessageSent => "message_sent",
             Self::TurnStopped => "turn_stopped",
+            Self::TurnFinished => "turn_finished",
+            Self::AgentFellBack => "agent_fell_back",
             Self::SessionReset => "session_reset",
             Self::PermissionAnswered => "permission_answered",
+            Self::ReactionAdded => "reaction_added",
+            Self::HandoffAnswered => "handoff_answered",
             Self::RoutineSaved => "routine_saved",
+            Self::RoutineToggled => "routine_toggled",
             Self::RoutineDeleted => "routine_deleted",
             Self::RoutineRun => "routine_run",
+            Self::RoutineRetried => "routine_retried",
+            Self::VoiceCallStarted => "voice_call_started",
             Self::VoiceCallFinished => "voice_call_finished",
             Self::RemoteScreenOpened => "remote_screen_opened",
+            Self::ScreenTakenOver => "screen_taken_over",
             Self::ConnectorInstalled => "connector_installed",
+            Self::ConnectorsImported => "connectors_imported",
+            Self::ConnectorRemoved => "connector_removed",
+            Self::ConnectorSigninStarted => "connector_signin_started",
             Self::SkillInstalled => "skill_installed",
+            Self::SkillRemoved => "skill_removed",
+            Self::SkillWritten => "skill_written",
+            Self::CredentialSaved => "credential_saved",
+            Self::AgentSetupStarted => "agent_setup_started",
+            Self::AgentSignedIn => "agent_signed_in",
+            Self::SettingChanged => "setting_changed",
+            Self::HostUpdateInstalled => "host_update_installed",
+            Self::Exception => "$exception",
         }
-    }
-
-    /// Events the computer's own apps report through `track` (the rest come from API calls).
-    fn client_reported(self) -> bool {
-        matches!(self, Self::AppOpened | Self::OnboardingCompleted | Self::SignedIn | Self::SignedOut)
     }
 }
 
 pub struct Analytics {
-    /// `None` until the owner has chosen.
-    enabled: Mutex<Option<bool>>,
-    tx: mpsc::UnboundedSender<Value>,
-    rx: Mutex<Option<mpsc::UnboundedReceiver<Value>>>,
+    enabled: Mutex<bool>,
+    tx: mpsc::UnboundedSender<Msg>,
+    rx: Mutex<Option<mpsc::UnboundedReceiver<Msg>>>,
+    session: Mutex<session::Session>,
+    /// The UTC day each phone last connected (`phone_connected`), in memory only.
+    phones: Mutex<HashMap<String, chrono::NaiveDate>>,
+}
+
+enum Msg {
+    Event(Value),
+    /// A panic, captured off the panicking thread (`errors::report_panics`).
+    Report(errors::Report),
+    /// Send what's queued now and answer when done.
+    Flush(oneshot::Sender<()>),
 }
 
 impl Analytics {
     pub fn load(store: &Store) -> Self {
-        let enabled = match store.kv_get(KV_ENABLED).as_deref() {
-            Some("1") => Some(true),
-            Some("0") => Some(false),
-            _ => None,
-        };
+        let enabled = store.kv_get(KV_ENABLED).as_deref() != Some("0");
         let (tx, rx) = mpsc::unbounded_channel();
-        Self { enabled: Mutex::new(enabled), tx, rx: Mutex::new(Some(rx)) }
+        Self {
+            enabled: Mutex::new(enabled),
+            tx,
+            rx: Mutex::new(Some(rx)),
+            session: Mutex::default(),
+            phones: Mutex::default(),
+        }
     }
 
-    /// `null` until asked, which is when the computer's apps ask.
-    pub fn state(&self) -> Option<bool> {
+    pub fn state(&self) -> bool {
         *self.enabled.locked()
     }
 
     pub fn set_enabled(&self, store: &Store, on: bool) -> Result<()> {
         store.kv_set(KV_ENABLED, if on { "1" } else { "0" })?;
-        *self.enabled.locked() = Some(on);
+        *self.enabled.locked() = on;
         Ok(())
     }
+}
 
-    fn enabled(&self) -> bool {
-        self.state() == Some(true)
+/// A phone's platform as the catalog names it.
+fn platform(p: &str) -> &'static str {
+    match p {
+        "ios" => "ios",
+        "android" => "android",
+        "macos" => "macos",
+        _ => "other",
     }
 }
 
-/// `track`: an event the computer's own app reports (app opened, signed in, …).
-pub fn track(hub: &Hub, b: &Value) -> Result<()> {
-    let event = Event::deserialize(&b["event"]).map_err(|_| anyhow::anyhow!("unknown event"))?;
-    anyhow::ensure!(event.client_reported(), "unknown event");
-    capture(hub, event, Map::new());
-    Ok(())
+/// The platform of the paired phone `key` (`other` for one this computer doesn't have).
+fn platform_of(hub: &Hub, key: &str) -> &'static str {
+    platform(hub.store.device(key).as_ref().map_or("", |d| d.platform.as_str()))
 }
 
-/// The event an API call stands for, with its properties, read before the call runs.
-pub fn observe(caller: &Caller, method: &str, b: &Value) -> Option<(Event, Map<String, Value>)> {
-    let mut p = Map::new();
-    let event = match method {
-        "createBot" => {
-            let group = b["kind"] == "group";
-            p.insert("kind".into(), (if group { "group" } else { "bot" }).into());
-            if group {
-                p.insert("members".into(), b["members"].as_array().map_or(0, Vec::len).into());
-            } else {
-                p.insert("agent".into(), b["backend"].clone());
-                p.insert("model".into(), b["model"].clone());
-            }
-            Event::BotCreated
-        }
-        "updateBot" => Event::BotUpdated,
-        "deleteBot" => Event::BotDeleted,
-        "send" => {
-            let in_thread = b["threadId"].as_str().is_some_and(|t| !t.is_empty());
-            p.insert("in_thread".into(), in_thread.into());
-            p.insert("attachments".into(), b["attachments"].as_array().map_or(0, Vec::len).into());
-            Event::MessageSent
-        }
-        "stop" => Event::TurnStopped,
-        "newSession" => Event::SessionReset,
-        "respondPermission" => Event::PermissionAnswered,
-        "saveRoutine" => Event::RoutineSaved,
-        "deleteRoutine" => Event::RoutineDeleted,
-        "runRoutine" => Event::RoutineRun,
-        "logCall" => {
-            p.insert("seconds".into(), b["seconds"].as_u64().unwrap_or(0).into());
-            Event::VoiceCallFinished
-        }
-        "screenPrepare" => Event::RemoteScreenOpened,
-        "installConnector" => {
-            // A catalog name is public; a custom connector's URL or command is not.
-            let catalog = b["registryName"].as_str().unwrap_or("custom");
-            p.insert("connector".into(), catalog.into());
-            Event::ConnectorInstalled
-        }
-        "installSkill" => {
-            p.insert("custom".into(), (!b["source"].is_string()).into());
-            Event::SkillInstalled
-        }
-        _ => return None,
-    };
-    let client = if matches!(caller, Caller::Local) { "local" } else { "remote" };
-    p.insert("client".into(), client.into());
-    Some((event, p))
-}
-
-/// Queues one event when the owner said yes. Signed in to a Codync account, events are
-/// linked to that account; otherwise to this install's random id, with no person profile.
+/// Queues one event unless the owner turned analytics off. Signed in to a Codync account,
+/// events are linked to that account; otherwise to this install's random id. Both get a
+/// person profile.
 pub fn capture(hub: &Hub, event: Event, mut properties: Map<String, Value>) {
-    if !hub.analytics.enabled() {
+    if !hub.analytics.state() {
         return;
     }
     let account = hub.cloud.status().owner.map(|o| o.user_id);
@@ -188,7 +228,7 @@ pub fn capture(hub: &Hub, event: Event, mut properties: Map<String, Value>) {
             tracing::warn!(error = format!("{e:#}"), "couldn't save the analytics identity");
         }
     }
-    properties.insert("$process_person_profile".into(), account.is_some().into());
+    properties.insert("$process_person_profile".into(), true.into());
     queue(hub, event.name(), account.as_deref().unwrap_or(&hub.host_id), properties);
 }
 
@@ -199,30 +239,52 @@ fn queue(hub: &Hub, event: &str, distinct_id: &str, mut properties: Map<String, 
         ("env".into(), (if option_env!("CODYNC_ENV") == Some("main") { "main" } else { "dev" }).into()),
         ("$os".into(), std::env::consts::OS.into()),
         ("arch".into(), std::env::consts::ARCH.into()),
-        ("$geoip_disable".into(), true.into()),
+        // Joins this computer's events across accounts and with its phones' `computer_paired`.
+        ("computer".into(), computer_tag(&hub.identity.computer_id()).into()),
+        ("$session_id".into(), hub.analytics.session.locked().id(SystemTime::now()).to_string().into()),
     ]);
-    let _ = hub.analytics.tx.send(json!({"event": event, "distinct_id": distinct_id, "properties": properties}));
+    let _ = hub.analytics.tx.send(Msg::Event(json!({
+        "event": event,
+        "distinct_id": distinct_id,
+        // When it happened, not when its batch left; the uuid makes a resent batch count once.
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "uuid": uuid::Uuid::new_v4().to_string(),
+        "properties": properties,
+    })));
+}
+
+/// A computer's analytics key: a hash of its id, so a phone's `computer_paired` joins the
+/// computer's events without revealing the id the relay knows it by.
+pub fn computer_tag(computer_id: &str) -> String {
+    use sha2::{Digest as _, Sha256};
+    use std::fmt::Write as _;
+    let hash = Sha256::digest(format!("codync-analytics:{computer_id}"));
+    hash[..8].iter().fold(String::new(), |mut s, b| {
+        let _ = write!(s, "{b:02x}");
+        s
+    })
 }
 
 /// Sends queued events in batches every `FLUSH_EVERY`; turning analytics off drops them.
 pub fn start(hub: &Arc<Hub>) {
     let Some(mut rx) = hub.analytics.rx.locked().take() else { return };
+    errors::report_panics(hub);
     let hub = hub.clone();
     tokio::spawn(async move {
         let mut pending: Vec<Value> = Vec::new();
         let mut tick = tokio::time::interval(FLUSH_EVERY);
         loop {
             tokio::select! {
-                event = rx.recv() => match event {
-                    Some(e) => pending.push(e),
+                msg = rx.recv() => match msg {
+                    Some(Msg::Event(e)) => pending.push(e),
+                    Some(Msg::Report(r)) => errors::capture_report(&hub, r),
+                    Some(Msg::Flush(done)) => {
+                        flush(&hub, &mut pending).await;
+                        let _ = done.send(());
+                    }
                     None => return,
                 },
-                _ = tick.tick() => {
-                    let sent = hub.analytics.enabled() && !pending.is_empty() && send(&pending).await;
-                    if sent || !hub.analytics.enabled() {
-                        pending.clear();
-                    }
-                }
+                _ = tick.tick() => flush(&hub, &mut pending).await,
             }
             if pending.len() > MAX_PENDING {
                 pending.drain(..pending.len() - MAX_PENDING);
@@ -231,7 +293,28 @@ pub fn start(hub: &Arc<Hub>) {
     });
 }
 
+async fn flush(hub: &Hub, pending: &mut Vec<Value>) {
+    let on = hub.analytics.state();
+    let sent = on && !pending.is_empty() && send(pending).await;
+    if sent || !on {
+        pending.clear();
+    }
+}
+
+/// Sends what's queued before the host exits, so a restart or update loses nothing.
+pub async fn flush_before_exit(hub: &Hub) {
+    let (tx, rx) = oneshot::channel();
+    if hub.analytics.tx.send(Msg::Flush(tx)).is_ok() {
+        let _ = tokio::time::timeout(Duration::from_secs(3), rx).await;
+    }
+}
+
 async fn send(batch: &[Value]) -> bool {
+    // Debug builds (`cargo test`, `cargo run`) are throwaway hosts: each e2e test's fresh
+    // home would count as a new user, and one built with `CODYNC_ENV=main` lands in production.
+    if cfg!(debug_assertions) {
+        return true;
+    }
     let body = json!({"api_key": TOKEN, "batch": batch});
     match crate::http().post(BATCH_URL).json(&body).timeout(Duration::from_secs(15)).send().await {
         Ok(r) if r.status().is_success() => true,
@@ -252,23 +335,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn observed_events_carry_no_content() {
-        let b = json!({"botId": "b1", "text": "secret plan", "threadId": "e1", "attachments": ["u1", "u2"]});
-        let (event, p) = observe(&Caller::Local, "send", &b).expect("send is tracked");
-        assert_eq!(event, Event::MessageSent);
-        assert_eq!(Value::Object(p.clone()), json!({"in_thread": true, "attachments": 2, "client": "local"}));
-        assert!(!Value::Object(p).to_string().contains("secret"));
-
-        let custom = json!({"name": "mine", "command": "/Users/me/bin/server"});
-        let (_, p) = observe(&Caller::Local, "installConnector", &custom).expect("tracked");
-        assert_eq!(p["connector"], "custom");
-        assert!(observe(&Caller::Local, "history", &json!({})).is_none());
+    fn on_until_the_owner_turns_it_off() {
+        let store = Store::open(std::path::Path::new(":memory:")).unwrap();
+        assert!(Analytics::load(&store).state());
+        Analytics::load(&store).set_enabled(&store, false).unwrap();
+        assert!(!Analytics::load(&store).state(), "an off stays off");
     }
 
     #[test]
-    fn only_app_events_can_be_tracked_directly() {
-        assert!(Event::deserialize(&json!("app_opened")).is_ok_and(Event::client_reported));
-        assert!(!Event::deserialize(&json!("message_sent")).is_ok_and(Event::client_reported));
-        assert!(Event::deserialize(&json!("anything_else")).is_err());
+    fn computer_tag_matches_the_iphone() {
+        // Same vector as the iPhone's AnalyticsTests.
+        assert_eq!(computer_tag("AAECAwQFBgcICQoLDA0ODw"), "2d6878bee20aba04");
     }
 }

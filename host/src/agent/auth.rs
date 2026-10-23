@@ -1,8 +1,11 @@
 //! Signing agents in the ACP way, so every agent that speaks ACP can be set up
 //! from Codync, not just the ones we know by name.
 //!
-//! A check starts the agent, reads the `authMethods` it advertises and tries
-//! `session/new`: `-32000` means it needs signing in. Methods come in three kinds:
+//! A check starts the agent and reads the `authMethods` it advertises. An agent that
+//! reports its login (`_auth/status_update`) is believed; when its report doesn't
+//! come, the harness's own CLI check decides, else it can't tell (a session proves
+//! nothing for it). Other agents get `session/new`: `-32000` means it needs signing
+//! in. Methods come in three kinds:
 //! - terminal: a command (the agent's `_meta.terminal-auth`, or its own binary
 //!   with `args`), run in a setup terminal (`term`);
 //! - agent: the agent signs itself in on `authenticate` (usually a browser on
@@ -20,6 +23,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
+use std::ops::ControlFlow;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -113,9 +117,9 @@ pub async fn models(store: &Store, backend: &str) -> Result<Value> {
     let result = tokio::time::timeout(Duration::from_secs(60), async {
         let request = acp.request("session/new", json!({"cwd": probe_dir(), "mcpServers": []}));
         tokio::pin!(request);
-        loop {
+        let session = loop {
             tokio::select! {
-                result = &mut request => break result,
+                result = &mut request => break result?,
                 incoming = inbox.recv() => match incoming {
                     Some(Incoming::Request { id, .. }) => {
                         acp.respond_error(id, -32601, "not supported during model discovery").await?;
@@ -124,12 +128,19 @@ pub async fn models(store: &Store, backend: &str) -> Result<Value> {
                     Some(Incoming::Closed { .. }) | None => bail!("agent closed during model discovery"),
                 }
             }
-        }
+        };
+        // Cursor lists each model's options (effort, fast…) only through its own method.
+        let options = if backend == "cursor" {
+            acp.request("cursor/list_available_models", json!({})).await.unwrap_or_default()
+        } else {
+            Value::Null
+        };
+        Ok((session, options))
     })
     .await;
     acp.kill().await;
-    let session = result.context("the agent's model list timed out")??;
-    Ok(model_catalog(&session))
+    let (session, options) = result.context("the agent's model list timed out")??;
+    Ok(model_catalog(&session, &options))
 }
 
 /// IDs are agent-defined: use the category, with legacy conventional IDs as a fallback.
@@ -143,7 +154,15 @@ pub(crate) fn model_config(session: &Value) -> Option<&Value> {
         .or_else(|| options.iter().filter(is_select).find(|v| v["id"] == "model" || v["id"] == "models"))
 }
 
-fn model_catalog(session: &Value) -> Value {
+/// The model ids the agent lists, in its order.
+pub(crate) fn model_ids(session: &Value) -> Vec<String> {
+    let catalog = model_catalog(session, &Value::Null);
+    catalog["models"].as_array().into_iter().flatten().filter_map(|m| text(&m["id"])).collect()
+}
+
+/// `{models: [{id, name, description, options}], currentModelId, fastMode}`; `options` is
+/// Cursor's `cursor/list_available_models` answer (`Null` for other agents).
+fn model_catalog(session: &Value, options: &Value) -> Value {
     fn collect(options: &Value, out: &mut Vec<Value>) {
         for option in options.as_array().into_iter().flatten() {
             if option["options"].is_array() {
@@ -171,12 +190,47 @@ fn model_catalog(session: &Value) -> Value {
         }
         text(&session["models"]["currentModelId"])
     };
-    json!({"models": models, "currentModelId": current})
+    for model in &mut models {
+        model["options"] = json!(model_options(options, model["id"].as_str().unwrap_or_default()));
+    }
+    json!({"models": models, "currentModelId": current,
+        "fastMode": crate::agent::config::fast_mode_config(session).is_some()})
+}
+
+/// One model's options as `[{id, name, values: [{id, name}], default}]`, from Cursor's
+/// `{models: [{value, configOptions}]}` (ACP select config options).
+fn model_options(options: &Value, model: &str) -> Vec<Value> {
+    let entry = options["models"].as_array().into_iter().flatten().find(|m| m["value"] == model);
+    entry
+        .and_then(|m| m["configOptions"].as_array())
+        .into_iter()
+        .flatten()
+        .filter(|o| o["type"] == "select")
+        .filter_map(|o| {
+            let id = text(&o["id"])?;
+            let values: Vec<Value> = o["options"]
+                .as_array()?
+                .iter()
+                .filter_map(|v| {
+                    let value = text(&v["value"])?;
+                    Some(json!({"id": value, "name": text(&v["name"]).unwrap_or(value)}))
+                })
+                .collect();
+            Some(json!({"id": id, "name": text(&o["name"]).unwrap_or(id), "values": values,
+                "default": text(&o["currentValue"])}))
+        })
+        .collect()
 }
 
 async fn probe(store: &Store, backend: &str) -> Result<Status> {
-    let (acp, _inbox, init, cmd) = start(store, backend).await?;
+    let (acp, mut inbox, init, cmd) = start(store, backend).await?;
     let methods = methods(backend, &init, &cmd);
+    if let ControlFlow::Break(signed_in) =
+        login_without_session(&init, &mut inbox, backend, &env(store, backend)?).await
+    {
+        acp.kill().await;
+        return Ok(Status { signed_in, detail: None, methods });
+    }
     let dir = probe_dir();
     tokio::fs::create_dir_all(&dir).await?;
     let res = tokio::time::timeout(
@@ -194,6 +248,47 @@ async fn probe(store: &Store, backend: &str) -> Result<Status> {
         Err(_) => (None, None),
     };
     Ok(Status { signed_in, detail, methods })
+}
+
+/// `Break`: the login of an agent that reports it, never judged by a session: Claude's adapter
+/// opens one without checking the login, which then fails at the first prompt. When its report
+/// doesn't come (the adapter gives its own `claude auth status` 5 s, too few on many Windows
+/// computers), the harness's CLI check decides, with more time and the agent's `env`, else it
+/// can't tell. `Continue`: the agent doesn't report its login, so a session tells.
+async fn login_without_session(
+    init: &Value,
+    inbox: &mut mpsc::UnboundedReceiver<Incoming>,
+    backend: &str,
+    env: &[(String, String)],
+) -> ControlFlow<Option<bool>> {
+    if !init["agentCapabilities"]["_meta"]["authStatus"].is_object() {
+        return ControlFlow::Continue(());
+    }
+    if let Some(reported) = reported_login(inbox).await {
+        return ControlFlow::Break(Some(reported));
+    }
+    ControlFlow::Break(match backends::harness(backend) {
+        Some(h) => backends::cli_signed_in(h, env).await,
+        None => None,
+    })
+}
+
+/// The agent's first `_auth/status_update` (ACP `authStatus` extension): `kind: "none"` is signed
+/// out, any other kind signed in. `None`: it can't tell (it stays silent then).
+async fn reported_login(inbox: &mut mpsc::UnboundedReceiver<Incoming>) -> Option<bool> {
+    // Claude's adapter gives its `claude auth status` 5 s.
+    let report = async {
+        while let Some(incoming) = inbox.recv().await {
+            if let Incoming::Notification { method, params } = incoming
+                && method == "_auth/status_update"
+                && let Some(kind) = params["authStatus"]["kind"].as_str()
+            {
+                return Some(kind != "none");
+            }
+        }
+        None
+    };
+    tokio::time::timeout(Duration::from_secs(8), report).await.ok().flatten()
 }
 
 /// Starts `backend` and completes `initialize`, trying each way to launch it.
@@ -228,9 +323,10 @@ async fn start(store: &Store, backend: &str) -> Result<Started> {
                 "clientCapabilities": {
                     "fs": {"readTextFile": false, "writeTextFile": false},
                     "terminal": false,
-                    // Ask for terminal sign-in methods (spec field and the older `_meta` flag).
+                    // Ask for terminal sign-in methods (spec field and the older `_meta` flag),
+                    // and for plain models with options, as bot sessions do (`bot::start_agent`).
                     "auth": {"terminal": true},
-                    "_meta": {"terminal-auth": true},
+                    "_meta": {"terminal-auth": true, "parameterizedModelPicker": true},
                 },
                 "clientInfo": {"name": "codync", "title": "Codync", "version": env!("CARGO_PKG_VERSION")},
             }),
@@ -378,24 +474,55 @@ mod tests {
             ]}]
         }], "models": {"availableModels": [{"modelId": "legacy", "name": "Legacy"}]}});
         assert_eq!(model_config(&session).unwrap()["id"], "provider-model");
-        let result = model_catalog(&session);
+        let result = model_catalog(&session, &Value::Null);
         assert_eq!(result["currentModelId"], "m2");
         assert_eq!(result["models"].as_array().unwrap().len(), 2);
         assert_eq!(result["models"][0]["id"], "m1");
         assert_eq!(result["models"][1]["name"], "Second");
+        assert_eq!(result["models"][1]["options"], json!([]));
+        assert_eq!(model_ids(&session), ["m1", "m2"]);
     }
 
     #[test]
     fn model_catalog_reads_legacy_and_missing_lists() {
-        let result = model_catalog(&json!({"models": {
-            "currentModelId": "a", "availableModels": [
-                {"modelId": "a", "name": "Agent model", "description": "Available here"},
-                {"name": "No ID"}
-            ]
-        }}));
+        let result = model_catalog(
+            &json!({"models": {
+                "currentModelId": "a", "availableModels": [
+                    {"modelId": "a", "name": "Agent model", "description": "Available here"},
+                    {"name": "No ID"}
+                ]
+            }}),
+            &Value::Null,
+        );
         assert_eq!(result["models"].as_array().unwrap().len(), 1);
         assert_eq!(result["models"][0]["description"], "Available here");
-        assert_eq!(model_catalog(&json!({})), json!({"models": [], "currentModelId": null}));
+        assert_eq!(
+            model_catalog(&json!({}), &Value::Null),
+            json!({"models": [], "currentModelId": null, "fastMode": false})
+        );
+    }
+
+    #[test]
+    fn model_catalog_adds_cursor_model_options() {
+        let session = json!({"configOptions": [{"id": "model", "category": "model", "type": "select",
+            "currentValue": "grok-4.7", "options": [{"value": "grok-4.7", "name": "Grok 4.7"}, {"value": "auto"}]}]});
+        let listed = json!({"models": [{"value": "grok-4.7", "name": "Grok 4.7", "configOptions": [
+            {"id": "reasoning_effort", "name": "Reasoning", "category": "thought_level", "type": "select",
+             "currentValue": "high", "options": [{"value": "medium", "name": "Medium"}, {"value": "high", "name": "High"}]},
+            {"id": "fast", "type": "select", "currentValue": "true", "options": [{"value": "false", "name": "Off"}, {"value": "true"}]},
+            {"id": "verbose", "type": "boolean"}
+        ]}]});
+        let result = model_catalog(&session, &listed);
+        assert_eq!(
+            result["models"][0]["options"],
+            json!([
+                {"id": "reasoning_effort", "name": "Reasoning", "default": "high",
+                 "values": [{"id": "medium", "name": "Medium"}, {"id": "high", "name": "High"}]},
+                {"id": "fast", "name": "fast", "default": "true",
+                 "values": [{"id": "false", "name": "Off"}, {"id": "true", "name": "true"}]}
+            ])
+        );
+        assert_eq!(result["models"][1]["options"], json!([]));
     }
 
     #[test]
@@ -442,6 +569,38 @@ mod tests {
         assert_eq!(m.len(), 5);
         // Commands stay on the host.
         assert!(serde_json::to_value(&m[0]).unwrap().get("command").is_none());
+    }
+
+    #[tokio::test]
+    async fn takes_the_first_login_the_agent_reports() {
+        let report = |kind: &str| Incoming::Notification {
+            method: "_auth/status_update".into(),
+            params: json!({"authStatus": {"kind": kind, "label": "x"}}),
+        };
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(Incoming::Notification { method: "session/update".into(), params: json!({}) }).unwrap();
+        tx.send(report("none")).unwrap();
+        tx.send(report("account")).unwrap();
+        assert_eq!(reported_login(&mut rx).await, Some(false));
+        assert_eq!(reported_login(&mut rx).await, Some(true));
+        drop(tx);
+        assert_eq!(reported_login(&mut rx).await, None, "an agent that goes quiet can't tell");
+    }
+
+    #[tokio::test]
+    async fn an_agent_that_reports_its_login_is_never_judged_by_a_session() {
+        let reports = json!({"agentCapabilities": {"_meta": {"authStatus": {}}}});
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        tx.send(Incoming::Notification {
+            method: "_auth/status_update".into(),
+            params: json!({"authStatus": {"kind": "none"}}),
+        })
+        .unwrap();
+        assert_eq!(login_without_session(&reports, &mut rx, "x", &[]).await, ControlFlow::Break(Some(false)));
+        drop(tx);
+        // No report and no CLI check: it can't tell, and still opens no session.
+        assert_eq!(login_without_session(&reports, &mut rx, "x", &[]).await, ControlFlow::Break(None));
+        assert_eq!(login_without_session(&json!({}), &mut rx, "x", &[]).await, ControlFlow::Continue(()));
     }
 
     #[test]

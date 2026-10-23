@@ -1,5 +1,6 @@
 """Persistent deterministic ACP sessions for routine restart and queue tests."""
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -56,6 +57,11 @@ def prompt(request, stop):
     fail = re.search(r"FAIL_ONCE\[([^]]+)\]", text)
     if fail and not pathlib.Path("failed-" + fail[1]).exists():
         pathlib.Path("failed-" + fail[1]).touch()
+        if "ACT_FIRST" in text:
+            # Changes something before failing, so the run may have done part of its work.
+            send({"method": "session/update", "params": {"sessionId": sid, "update": {
+                "sessionUpdate": "tool_call", "toolCallId": "act", "title": "Send the report",
+                "kind": "edit", "status": "completed"}}})
         log("failed", sid, text)
         send({"id": request["id"], "error": {"code": -32000, "message": "transient fixture failure"}})
         return
@@ -125,13 +131,17 @@ for line in sys.stdin:
     request = json.loads(line)
     method = request.get("method")
     if method == "initialize":
-        send({"id": request["id"], "result": {"agentCapabilities": {"loadSession": not pathlib.Path("no-load").exists()}}})
+        log("initialize", "", str(os.getpid()))
+        capabilities = {"loadSession": not pathlib.Path("no-load").exists(), "sessionCapabilities": {"close": {}}}
+        send({"id": request["id"], "result": {"agentCapabilities": capabilities}})
     elif method == "session/new":
         servers = request["params"]["mcpServers"]
-        send({"id": request["id"], "result": {"sessionId": str(uuid.uuid4())}})
+        if "--hang-new" not in sys.argv:  # an agent stuck starting never answers
+            send({"id": request["id"], "result": {"sessionId": str(uuid.uuid4())}})
     elif method == "session/load":
         sid = request["params"]["sessionId"]
         if sid in sessions:
+            log("loaded", sid, "")
             send({"id": request["id"], "result": {"sessionId": sid}})
         else:
             send({"id": request["id"], "error": {"code": -32000, "message": "unknown session"}})
@@ -140,5 +150,8 @@ for line in sys.stdin:
         threading.Thread(target=prompt, args=(request, cancel), daemon=True).start()
     elif method == "session/cancel":
         cancel.set()
+    elif method == "session/close":
+        log("closed", request["params"]["sessionId"], "")
+        send({"id": request["id"], "result": {}})
     elif "id" in request:
         send({"id": request["id"], "result": {}})

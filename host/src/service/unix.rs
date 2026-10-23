@@ -30,6 +30,18 @@ pub fn start() -> Result<()> {
     }
 }
 
+/// Whether launchd or systemd started this process as the installed service, not a terminal or
+/// the desktop app's development run.
+pub fn started_by_service() -> bool {
+    if cfg!(target_os = "macos") {
+        // launchd names the job; a process started from a terminal or an app has another name.
+        std::env::var("XPC_SERVICE_NAME").is_ok_and(|name| name == LABEL)
+    } else {
+        // systemd (248+) names the service's main process; a shell inherits its terminal's.
+        std::env::var("SYSTEMD_EXEC_PID").is_ok_and(|pid| pid == std::process::id().to_string())
+    }
+}
+
 /// Refuse to replace one installation while restarting a service owned by another.
 pub fn require_executable(expected: &Path) -> Result<()> {
     let configured = if cfg!(target_os = "macos") {
@@ -46,7 +58,8 @@ pub fn require_executable(expected: &Path) -> Result<()> {
         let command =
             unit.lines().find_map(|line| line.strip_prefix("ExecStart=")).context("service has no ExecStart")?;
         let args = shlex::split(command).context("invalid service ExecStart")?;
-        PathBuf::from(args.first().context("service has no executable")?)
+        let exe = args.first().context("service has no executable")?;
+        PathBuf::from(exe.replace("%%", "%").replace("$$", "$"))
     };
     if configured.canonicalize()? != expected.canonicalize()? {
         bail!("the installed service runs another host binary; run that binary's update command");
@@ -64,6 +77,13 @@ fn systemd_unit() -> PathBuf {
 
 fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// One quoted systemd word: a PATH with spaces (WSL's `Program Files`) stays whole, and `%`
+/// is never read as a specifier. `ExecStart` also expands `$`, so it is doubled there.
+fn systemd_quote(s: &str, exec: bool) -> String {
+    let s = s.replace('\\', "\\\\").replace('"', "\\\"").replace('%', "%%");
+    format!("\"{}\"", if exec { s.replace('$', "$$") } else { s })
 }
 
 /// Installs and starts the host as a per-user background service. The current
@@ -107,8 +127,10 @@ pub fn install(port: u16) -> Result<()> {
         run("launchctl", &["bootstrap", &format!("gui/{uid}"), &file.to_string_lossy()])?;
     } else {
         let unit = format!(
-            "[Unit]\nDescription=Codync host\nAfter=network-online.target\n\n[Service]\nExecStart={exe} serve --port {port}\nEnvironment=PATH={path}\nEnvironment=\"CODYNC_HOME={data}\"\nRestart=always\nRestartSec=3\n\n[Install]\nWantedBy=default.target\n",
-            data = data_dir().display(),
+            "[Unit]\nDescription=Codync host\nAfter=network-online.target\n\n[Service]\nExecStart={exe} serve --port {port}\nEnvironment={path}\nEnvironment={data}\nRestart=always\nRestartSec=3\n\n[Install]\nWantedBy=default.target\n",
+            exe = systemd_quote(&exe, true),
+            path = systemd_quote(&format!("PATH={path}"), false),
+            data = systemd_quote(&format!("CODYNC_HOME={}", data_dir().display()), false),
         );
         let file = systemd_unit();
         create_parent(&file)?;
@@ -148,4 +170,22 @@ fn current_uid() -> String {
         .ok()
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map_or_else(|| "501".into(), |s| s.trim().to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::systemd_quote;
+
+    #[test]
+    fn unit_values_stay_one_word() {
+        let path = r#"/usr/bin:/mnt/c/Program Files/a"b\c:/x%y"#;
+        assert_eq!(
+            systemd_quote(&format!("PATH={path}"), false),
+            r#""PATH=/usr/bin:/mnt/c/Program Files/a\"b\\c:/x%%y""#
+        );
+        let exe = systemd_quote("/home/me/My $bin/codync-host", true);
+        assert_eq!(exe, r#""/home/me/My $$bin/codync-host""#);
+        let parsed = shlex::split(&format!("{exe} serve")).unwrap();
+        assert_eq!(parsed[0].replace("%%", "%").replace("$$", "$"), "/home/me/My $bin/codync-host");
+    }
 }

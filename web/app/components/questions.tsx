@@ -1,6 +1,6 @@
-import { Plus } from "@phosphor-icons/react/ssr";
+import { DiscordLogo, Plus } from "@phosphor-icons/react/ssr";
 import Reveal from "./reveal";
-import { GITHUB } from "../links";
+import { DISCORD } from "../links";
 
 const questions: [string, string][] = [
   [
@@ -29,7 +29,11 @@ const questions: [string, string][] = [
   ],
   [
     "Which computers can run it?",
-    "A Mac, a Windows PC, or a Linux desktop or headless server. The iPhone app and the terminal UI over SSH talk to the same host.",
+    "A Mac, a Windows PC, or a Linux desktop or headless server. The iPhone app and the terminal UI over SSH talk to the same host, and the Mac and Linux apps add other machines over SSH, with their bots in the same sidebar.",
+  ],
+  [
+    "What happens when my agent runs out of usage?",
+    "Give the bot fallbacks and the next agent in its list, say Codex after Claude Code, carries on with the same turn, chat, memory and folder. The bot goes back to its own agent once that one resets. Without fallbacks, the chat offers to add one.",
   ],
   [
     "Is it safe to let bots work on my computer?",
@@ -62,10 +66,11 @@ export default function Questions() {
             Short answers about price, setup, agents and your data.
           </p>
           <a
-            href={`${GITHUB}/issues`}
-            className="mt-6 inline-block font-medium text-neutral-200 underline underline-offset-4 hover:text-white"
+            href={DISCORD}
+            className="mt-6 inline-flex items-center gap-2 font-medium text-neutral-200 hover:text-white"
           >
-            Ask something else
+            <DiscordLogo size={20} />
+            <span className="underline underline-offset-4">Ask on Discord</span>
           </a>
         </Reveal>
         <Reveal delay={0.05}>

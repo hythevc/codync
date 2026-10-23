@@ -202,7 +202,10 @@ pub async fn run(hub: Arc<Hub>, t: Transport, kind: ChannelKind) {
     let _ = ch.tx.send(ToDevice::Close(code, reason)).await;
     let hub = ch.hub.clone();
     drop(ch);
-    let _ = writer.await;
+    // `serve` already took the writer's end when it stopped first; polling it again panics.
+    if !writer.is_finished() {
+        let _ = writer.await;
+    }
     // Only now, with the answer and the `4100` handed to the transport: a relay publishes the
     // new ACL (offer gone) behind them on the same socket, so the pairing link isn't cut first.
     if code == close::PAIRED {
@@ -316,6 +319,7 @@ impl Online {
         if let Err(error) = hub.store.touch_device(&key) {
             tracing::warn!(error = format!("{error:#}"), "couldn't record when a device was last seen");
         }
+        crate::analytics::phone_connected(&hub, &key);
         Self(hub, key)
     }
 }
@@ -564,9 +568,9 @@ impl Channel {
         }
         let b = &v["b"];
         let name = b["name"].as_str().map(str::trim).filter(|n| !n.is_empty() && n.chars().count() <= 100);
-        let platform = b["platform"].as_str().filter(|p| matches!(*p, "ios" | "macos"));
+        let platform = b["platform"].as_str().filter(|p| matches!(*p, "ios" | "macos" | "android"));
         let (Some(name), Some(platform)) = (name, platform) else {
-            self.send(err(id, 400, "`name` and `platform` (ios or macos) are required")).await;
+            self.send(err(id, 400, "`name` and `platform` (ios, macos or android) are required")).await;
             return protocol;
         };
         if !self.hub.pairing.locked().attempt(source) {
@@ -596,6 +600,7 @@ impl Channel {
             return (close::NORMAL, "");
         }
         tracing::info!(device = self.key, platform, "device paired");
+        crate::analytics::device_paired(&self.hub, crate::analytics::Via::Qr, platform, false);
         let name = crate::service::host_name();
         self.send(json!({"id": id, "ok": {"computerId": self.hub.identity.computer_id(), "name": name}})).await;
         (close::PAIRED, "paired")
@@ -625,14 +630,16 @@ mod tests {
         rx: mpsc::Receiver<Out>,
         sealer: Option<Sealer>,
         opener: Option<Opener>,
+        /// The host's side of this channel.
+        run: tokio::task::JoinHandle<()>,
     }
 
     impl Phone {
         fn connect(hub: &Arc<Hub>, key: SigningKey, kind: ChannelKind) -> Self {
             let (tx, incoming) = mpsc::channel(64);
             let (outgoing, rx) = mpsc::channel(64);
-            tokio::spawn(run(hub.clone(), Transport { incoming, outgoing }, kind));
-            Self { key, tx, rx, sealer: None, opener: None }
+            let run = tokio::spawn(run(hub.clone(), Transport { incoming, outgoing }, kind));
+            Self { key, tx, rx, sealer: None, opener: None, run }
         }
 
         fn direct(hub: &Arc<Hub>, key: SigningKey) -> Self {
@@ -725,6 +732,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn android_pairing_preserves_authorization_and_one_time_code() {
+        let hub = temp_hub();
+        let key = SigningKey::from_bytes(&crypto::random());
+        let code = hub.pairing.locked().issue().code;
+        let mut phone = Phone::direct(&hub, key.clone());
+        assert!(matches!(phone.hello(&hub, true).await, Out::Msg(v) if v["t"] == "welcome"));
+        let reply = phone.call(1, "pair", json!({"code": code, "name": "Android phone", "platform": "android"})).await;
+        assert_eq!(reply["ok"]["computerId"], hub.identity.computer_id());
+        assert_eq!(phone.recv().await.unwrap_err().0, close::PAIRED);
+        let device = hub.store.device(&phone.dk()).unwrap();
+        assert_eq!(device.platform, "android");
+        assert_eq!(device.source, DeviceSource::Local);
+        assert_eq!(device.scopes, [Scope::Control, Scope::Screen]);
+        assert!(!hub.pairing.locked().open());
+
+        let mut connected = Phone::direct(&hub, key);
+        assert!(matches!(connected.hello(&hub, false).await, Out::Msg(v) if v["t"] == "welcome"));
+        let hello = connected.call(1, "hello", json!({})).await;
+        assert_eq!(hello["ok"]["computerId"], hub.identity.computer_id());
+        let refused = connected.call(2, "setScreenEnabled", json!({"enabled": true})).await;
+        assert_eq!(refused["err"]["status"], 403);
+    }
+
+    #[tokio::test]
     async fn unknown_device_is_rejected() {
         let hub = temp_hub();
         let mut p = Phone::direct(&hub, SigningKey::from_bytes(&crypto::random()));
@@ -755,6 +786,7 @@ mod tests {
             "setScreenEnabled",
             "setAnalytics",
             "track",
+            "reportError",
             "pairing",
             "devices",
             "revokeDevice",
@@ -822,7 +854,7 @@ mod tests {
         p.send(json!({"id": 3, "sub": "events", "b": {"since": hub.store.current_rev(), "client": "ios"}})).await;
         let hello = p.recv().await.unwrap();
         assert_eq!((hello["id"].as_u64(), hello["ev"]["type"].as_str()), (Some(3), Some("hello")));
-        assert!(hub.ios_connected());
+        assert!(hub.phone_connected());
 
         assert!(hub.revoke_device(&dk).unwrap());
         let (code, reject) = p.recv().await.unwrap_err();
@@ -831,7 +863,7 @@ mod tests {
         assert!(hub.store.push_tickets().is_empty());
         assert_eq!(hub.store.activity_tickets("b1").len(), 0);
         tokio::time::sleep(Duration::from_millis(50)).await;
-        assert!(!hub.ios_connected(), "the events subscription ended with the channel");
+        assert!(!hub.phone_connected(), "the events subscription ended with the channel");
         assert!(hub.connected.locked().is_empty());
     }
 
@@ -924,5 +956,18 @@ mod tests {
             last = Some(out);
         }
         assert!(matches!(last, Some(Out::Close(close::PAIRED, _))), "got {last:?}");
+    }
+
+    #[tokio::test]
+    async fn a_device_that_stops_reading_ends_the_channel_cleanly() {
+        let hub = temp_hub();
+        let key = paired_phone(&hub).await;
+        let mut p = Phone::direct(&hub, key);
+        p.hello(&hub, false).await;
+        assert_eq!(p.call(1, "hello", json!({})).await["id"], 1);
+        // The transport is gone: the next answer can't be written, so the writer ends first.
+        p.rx.close();
+        p.send(json!({"id": 2, "m": "hello", "b": {}})).await;
+        timeout(Duration::from_secs(5), p.run).await.expect("the channel ends").expect("without a panic");
     }
 }

@@ -2,7 +2,6 @@
 //! terminals, usage, folders, voice and the remote screen.
 
 use super::devices::Caller;
-use super::events::CATCH_UP_PER_BOT;
 use super::str_arg;
 use crate::LockExt;
 use crate::agent::backends;
@@ -23,11 +22,10 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         "installHostUpdate" => {
             let port = hub.port;
             let force = b["force"].as_bool().unwrap_or(false);
-            let skip_app_check = b["skipAppCheck"].as_bool().unwrap_or(false);
             if !force && hub.busy() {
                 bail!("host is busy; retry when idle or explicitly allow interruption");
             }
-            tokio::task::spawn_blocking(move || crate::update::spawn_worker(port, force, skip_app_check)).await??;
+            tokio::task::spawn_blocking(move || crate::update::spawn_worker(port, force)).await??;
             json!({"scheduled": true})
         }
         "voiceStatus" => crate::voice::status(&hub.store)?,
@@ -79,19 +77,9 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
                 "urls": tokio::task::spawn_blocking(move || crate::service::addresses(port)).await?,
             })
         }
-        "sync" => {
-            let since = b["since"].as_i64().unwrap_or(0);
-            json!({
-                "hostId": hub.host_id,
-                "rev": hub.store.current_rev(),
-                "bots": hub.bots_json(since)?,
-                "entries": hub.store.entries_since(since, CATCH_UP_PER_BOT)?,
-                "usage": hub.usage.locked().clone(),
-            })
-        }
         "refreshBackends" => {
             tokio::task::spawn_blocking(backends::hydrate_path).await?;
-            backends::refresh_sign_in().await;
+            crate::market::agent_sign_in::refresh(hub).await;
             json!({"backends": backends::list()})
         }
         "usage" => {
@@ -108,16 +96,28 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             let step: crate::agent::term::Step =
                 serde_json::from_value(b["step"].clone()).context("`step` is install or login")?;
             let (cols, rows) = term_size(&b);
-            json!({"term": hub.terms.start(str_arg(&b, "backend")?, step, b["method"].as_str(), cols, rows).await?})
+            // Node.js belongs to the computer, not to one agent.
+            let backend = if step == crate::agent::term::Step::Node { "" } else { str_arg(&b, "backend")? };
+            json!({"term": hub.terms.start(backend, step, b["method"].as_str(), cols, rows).await?})
         }
         "agentModels" => crate::agent::auth::models(&hub.store, str_arg(&b, "backend")?).await?,
-        "agentAuth" => crate::agent::auth::check(&hub.store, str_arg(&b, "backend")?).await?,
-        "agentAuthenticate" => {
-            crate::agent::auth::authenticate(&hub.store, str_arg(&b, "backend")?, str_arg(&b, "method")?).await?
-        }
-        "setAgentEnv" => {
-            let vars = b["vars"].as_object().ok_or_else(|| anyhow!("`vars` is required"))?;
-            crate::agent::auth::set_env(&hub.store, str_arg(&b, "backend")?, vars).await?
+        "agentAuth" | "agentAuthenticate" | "setAgentEnv" => {
+            let backend = str_arg(&b, "backend")?;
+            let status = match method {
+                "agentAuth" => crate::agent::auth::check(&hub.store, backend).await?,
+                "agentAuthenticate" => {
+                    crate::agent::auth::authenticate(&hub.store, backend, str_arg(&b, "method")?).await?
+                }
+                _ => {
+                    let vars = b["vars"].as_object().ok_or_else(|| anyhow!("`vars` is required"))?;
+                    crate::agent::auth::set_env(&hub.store, backend, vars).await?
+                }
+            };
+            // Chats that asked the user to sign in get their messages answered now.
+            if status["signedIn"] == true {
+                crate::market::agent_sign_in::agent_signed_in(hub, backend)?;
+            }
+            status
         }
         "termInput" => {
             hub.terms.write(str_arg(&b, "term")?, str_arg(&b, "data")?)?;
@@ -150,13 +150,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         }
         "screenOffer" => {
             let display = b["display"].as_u64().and_then(|d| u32::try_from(d).ok());
-            let result =
-                hub.screen.offer(caller.device_key(), str_arg(&b, "sdp")?, b["session"].as_str(), display).await?;
-            if b["session"].as_str().is_none() {
-                let session = result["session"].as_str().context("missing screen session")?.to_owned();
-                tokio::spawn(crate::screen::watch_viewer(hub.clone(), session, caller.device_key().to_owned()));
-            }
-            result
+            hub.screen.offer(caller.device_key(), str_arg(&b, "sdp")?, str_arg(&b, "session")?, display).await?
         }
         "screenClose" => {
             let session = str_arg(&b, "session")?;
@@ -175,6 +169,10 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         }
         "track" => {
             crate::analytics::track(hub, &b)?;
+            json!({})
+        }
+        "reportError" => {
+            crate::analytics::errors::report(hub, &b)?;
             json!({})
         }
         "setScreenEnabled" => {

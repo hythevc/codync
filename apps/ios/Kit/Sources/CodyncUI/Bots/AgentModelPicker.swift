@@ -2,9 +2,17 @@ import CodyncKit
 import SwiftUI
 
 /// Models come from the selected computer's agent, never a bundled provider list.
+/// Fast mode is a second card row, shown while the agent offers it or while it's on
+/// (so it can be turned off).
 struct AgentModelPicker: View {
     let backend: String
     @Binding var selection: String?
+    /// The selected model's settings (effort, fast…); they belong to one model.
+    @Binding var options: [String: String]
+    /// Nil when picking a fallback's model: the bot's own Fast mode applies to it, and no session restarts.
+    var fastMode: Binding<Bool>?
+    /// The saved bot: whether its own sessions offer Fast mode, and why the agent refused it.
+    var bot: Bot?
     @Environment(BotStore.self) private var store
     @State private var catalog: AgentModels?
     @State private var catalogScope: String?
@@ -23,7 +31,7 @@ struct AgentModelPicker: View {
         catalog?.models.first { $0.name.lowercased().hasPrefix("default") }
     }
 
-    private var options: [(String, String)] {
+    private var modelChoices: [(String, String)] {
         let available = (catalog?.models ?? []).filter { $0.id != agentDefault?.id }
         let current = available.first { $0.id == catalog?.currentModelId }?.name
         var result = [("", agentDefault?.name ?? current.map { "Default · \($0)" } ?? "Default")]
@@ -38,11 +46,50 @@ struct AgentModelPicker: View {
     private var value: Binding<String> {
         Binding(
             get: { selection == agentDefault?.id ? "" : selection ?? "" },
-            set: { selection = $0.isEmpty ? nil : $0 }
+            set: {
+                let model = $0.isEmpty ? nil : $0
+                guard model != selection else { return }
+                selection = model
+                options = [:]
+            }
         )
     }
 
+    /// Settings the selected model offers.
+    private var modelOptions: [AgentModels.Option] {
+        catalog?.models.first { $0.id == value.wrappedValue }?.options ?? []
+    }
+
+    private func optionValue(_ id: String) -> Binding<String> {
+        Binding(get: { options[id] ?? "" }, set: { options[id] = $0.isEmpty ? nil : $0 })
+    }
+
+    private func choices(_ option: AgentModels.Option) -> [(String, String)] {
+        let fallback = option.values.first { $0.id == option.default }?.name
+        return [("", fallback.map { "Default · \($0)" } ?? "Default")] + option.values.map { ($0.id, $0.name) }
+    }
+
+    private var showsFastMode: Bool {
+        guard let fastMode else { return false }
+        return (backend != "custom" && catalog?.fastMode == true) || fastMode.wrappedValue
+            || (bot?.backend == backend && bot?.fastModeShown == true)
+    }
+
     var body: some View {
+        modelRow
+            .onChange(of: backend) { _, _ in
+                selection = nil
+                options = [:]
+            }
+            .task(id: requestKey) { await load() }
+        if showsFastMode, let fastMode {
+            SwitchRow("Fast mode", detail: bot?.fastModeRefusal ?? "Faster replies for more usage, on models that offer it.",
+                      isOn: fastMode)
+                .transition(.opacity)
+        }
+    }
+
+    private var modelRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text("Model")
@@ -59,9 +106,19 @@ struct AgentModelPicker: View {
                             .frame(minWidth: 0, maxWidth: 180)
                             .outlinedPill()
                     } else {
-                        ChoicePicker(selection: value, options: options, fitsAvailableWidth: true)
+                        ChoicePicker(selection: value, options: modelChoices, fitsAvailableWidth: true)
                     }
                 }
+            }
+            ForEach(modelOptions) { option in
+                HStack(spacing: 8) {
+                    Text(option.name)
+                        .foregroundStyle(Palette.text)
+                        .fixedSize()
+                    Spacer(minLength: 0)
+                    ChoicePicker(selection: optionValue(option.id), options: choices(option), fitsAvailableWidth: true)
+                }
+                .transition(.opacity)
             }
             if backend != "custom", !loading {
                 if let failure {
@@ -74,12 +131,13 @@ struct AgentModelPicker: View {
                         .foregroundStyle(Palette.secondary)
                 }
             }
-            Text("Changing the model starts a new agent session. Chat history is kept.")
-                .font(.caption)
-                .foregroundStyle(Palette.secondary)
+            if fastMode != nil {
+                Text("Changing the model starts a new agent session. Chat history is kept.")
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondary)
+            }
         }
-        .onChange(of: backend) { _, _ in selection = nil }
-        .task(id: requestKey) { await load() }
+        .animation(Motion.reduced(Motion.fade, reduceMotion), value: modelOptions.map(\.id))
     }
 
     /// Loading and refresh share one fixed slot, so the row never grows for loading.
@@ -118,7 +176,7 @@ struct AgentModelPicker: View {
         do {
             let response = try await client.agentModels(backend)
             try Task.checkCancellation()
-            catalog = response
+            withAnimation(Motion.reduced(Motion.fade, reduceMotion)) { catalog = response }
         } catch {
             guard !Task.isCancelled else { return }
             failure = "Couldn't load models: \(error.localizedDescription)"

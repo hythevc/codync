@@ -1,8 +1,10 @@
 import type { VersionMismatch } from '@shared/compat'
 import { Button } from '../components/Controls'
 import { Icon } from '../components/Icon'
-import { font } from '../lib/fonts'
+import { HStack, VStack } from '../components/Stack'
+import { Text } from '../components/Text'
 import { useApp, useStore } from '../store/context'
+import { UpdateButton, useUpdates } from './UpdateButton'
 
 /** The words every client uses for a version mismatch (iOS, the TUI and this app). */
 export const updateNeededText = {
@@ -30,30 +32,27 @@ export const updateNeededText = {
 export function UpdateNeededCard() {
   const app = useApp()
   const store = useStore()
+  const updates = useUpdates()
   const mismatch = store.mismatch
   if (!mismatch) return null
-  // This app updates itself; on macOS and Windows this computer's own host is put back on the
-  // app's bundled copy. Linux has no bundled host, so the card says how to update it instead.
-  const action: [string, () => void] | null =
-    mismatch.kind === 'updateApp'
-      ? ['Update Codync', () => window.codync.updates.check()]
-      : store === app.local && !app.host.dev && window.codync.platform !== 'linux'
-        ? [`Update ${store.hostName}`, () => window.codync.host.restart()]
-        : null
+  // This app updates itself (its download and restart, as in Settings); on macOS and Windows this
+  // computer's own host is put back on the app's bundled copy. Linux has no bundled host, so the
+  // card says how to update it instead.
+  const updatesApp = mismatch.kind === 'updateApp'
+  const restartsHost = !updatesApp && store === app.local && !app.host.dev && window.codync.platform !== 'linux'
+  const button = updatesApp
+    ? updates && <UpdateButton updates={updates} kind="primary" />
+    : restartsHost && <Button onClick={() => window.codync.host.restart()}>{`Update ${store.hostName}`}</Button>
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: 14, background: 'var(--surface)', borderRadius: 16 }}>
+    <HStack align="flex-start" gap={12} className="update-needed">
       <Icon name="arrow.down.circle" size={15} color="var(--warning)" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
-        <div style={{ ...font('subheadline', 'semibold'), color: 'var(--text)' }}>{updateNeededText.title(mismatch, store.hostName)}</div>
-        <div style={{ ...font('footnote'), color: 'var(--secondary)' }}>
-          {updateNeededText.detail(mismatch, store.hostName, store.hostVersion?.version, store.hello?.os, action === null)}
-        </div>
-        {action ? (
-          <Button onClick={action[1]} style={{ marginTop: 4, alignSelf: 'flex-start' }}>
-            {action[0]}
-          </Button>
-        ) : null}
-      </div>
-    </div>
+      <VStack gap={6} grow>
+        <Text as="div" size="subheadline" weight="semibold" tone="text">{updateNeededText.title(mismatch, store.hostName)}</Text>
+        <Text as="div" size="footnote" tone="secondary">
+          {updateNeededText.detail(mismatch, store.hostName, store.hostVersion?.version, store.hello?.os, !updatesApp && !restartsHost)}
+        </Text>
+        {button ? <div className="update-needed-action">{button}</div> : null}
+      </VStack>
+    </HStack>
   )
 }

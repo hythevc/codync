@@ -6,7 +6,7 @@ mod common;
 
 use serde_json::{Value, json};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
 use std::time::Duration;
 
 struct Host {
@@ -27,54 +27,15 @@ impl Host {
     async fn start() -> Self {
         let home = std::env::temp_dir().join(format!("codync-files-e2e-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
-        common::seed_memory_runtime(&home);
-        let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-        let child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
-            .args(["serve", "--bind", "127.0.0.1", "--port", &port.to_string()])
-            .env("CODYNC_CLOUD", "off")
-            .env("CODYNC_HOME", &home)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
-        let mut host = Self { child, home, base: format!("http://127.0.0.1:{port}"), token: String::new() };
-        let waited = tokio::time::timeout(Duration::from_secs(20), async {
-            loop {
-                let response = reqwest::get(format!("{}/health", host.base)).await;
-                if response.is_ok() {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(50)).await;
-            }
-        })
-        .await;
-        waited.unwrap();
+        let (child, base) = common::serve(&home).await;
+        let mut host = Self { child, home, base, token: String::new() };
         std::fs::read_to_string(host.home.join("token")).unwrap().trim().clone_into(&mut host.token);
         host
     }
 
     async fn restart(&mut self) {
         common::stop(&mut self.child);
-        let port = self.base.rsplit(':').next().unwrap();
-        self.child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
-            .args(["serve", "--bind", "127.0.0.1", "--port", port])
-            .env("CODYNC_CLOUD", "off")
-            .env("CODYNC_HOME", &self.home)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
-        let waited = tokio::time::timeout(Duration::from_secs(20), async {
-            loop {
-                let response = reqwest::get(format!("{}/health", self.base)).await;
-                if response.is_ok() {
-                    break;
-                }
-                tokio::time::sleep(Duration::from_millis(50)).await;
-            }
-        })
-        .await;
-        waited.unwrap();
+        (self.child, self.base) = common::serve(&self.home).await;
     }
 
     async fn call(&self, method: &str, body: Value) -> Value {
@@ -82,7 +43,8 @@ impl Host {
             .post(format!("{}/api/{method}", self.base))
             .bearer_auth(&self.token)
             .json(&body)
-            .timeout(Duration::from_secs(10))
+            // As long as `common::host`'s: on a busy machine (parallel tests) `createBot` alone can take over 10 s.
+            .timeout(Duration::from_secs(120))
             .send()
             .await;
         let response = response_result.unwrap();
@@ -113,7 +75,7 @@ async fn ready(host: &Host, bot: &str, expected_files: usize) -> Vec<Value> {
 }
 
 #[tokio::test]
-async fn publishes_all_types_with_final_text_and_survives_restart_workspace_changes_and_threads() {
+async fn publishes_all_types_with_final_text_and_survives_restart_workspace_changes_and_replies() {
     use base64::Engine as _;
     let mut host = Host::start().await;
     let cwd = host.home.join("workspace");
@@ -172,28 +134,10 @@ async fn publishes_all_types_with_final_text_and_survives_restart_workspace_chan
     host.call("send", json!({"botId":bot,"text":"share-files resumed"})).await;
     ready(&host, bot, 8).await;
     assert!(cwd.join("resumed").exists());
-    host.call("send", json!({"botId":bot,"text":"share-files in a thread", "threadId":root["entry"]["id"]})).await;
-    let waited = tokio::time::timeout(Duration::from_secs(30), async {
-        loop {
-            let response = host.call("thread", json!({"botId":bot,"rootId":root["entry"]["id"]})).await;
-            let files: Vec<_> = response["entries"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter(|e| e["data"]["files"].is_array())
-                .cloned()
-                .collect();
-            if files.len() == 4 {
-                let file = &files[0];
-                host.call("readFile", json!({"entryId":file["id"],"fileId":file["data"]["files"][0]["id"],"offset":0}))
-                    .await;
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
-    })
-    .await;
-    waited.unwrap();
+    host.call("send", json!({"botId":bot,"text":"share-files in a reply", "replyTo":root["entry"]["id"]})).await;
+    let entries = ready(&host, bot, 12).await;
+    let file = entries.iter().rfind(|e| e["data"]["files"].is_array()).unwrap();
+    host.call("readFile", json!({"entryId":file["id"],"fileId":file["data"]["files"][0]["id"],"offset":0})).await;
     let mut updated = created["bot"].clone();
     updated["cwd"] = host.home.to_string_lossy().into();
     host.call("updateBot", updated).await;
@@ -226,11 +170,16 @@ async fn rejects_invalid_sources_without_a_file_entry() {
 async fn rejected(path: &std::path::Path) {
     let waited = tokio::time::timeout(Duration::from_secs(20), async {
         loop {
-            if let Ok(data) = std::fs::read(path) {
-                let results: Value = serde_json::from_slice(&data).unwrap();
+            // A file that doesn't parse yet is still being written by the agent.
+            if let Ok(data) = std::fs::read(path)
+                && let Ok(results) = serde_json::from_slice::<Value>(&data)
+            {
                 assert!(
                     results.as_array().unwrap().iter().all(|result| result["isError"] == true
-                        && result["content"][0]["text"].as_str().unwrap().contains("own chat and threads")),
+                        && result["content"][0]["text"]
+                            .as_str()
+                            .unwrap()
+                            .contains("only available in the bot's own chat")),
                     "{results}"
                 );
                 break;
@@ -307,7 +256,7 @@ async fn files_only_turns_finish_without_duplicate_text_and_input_uploads_still_
                 .iter()
                 .filter(|e| e["kind"] == "agent" && e["data"]["final"] == true)
                 .collect();
-            let sync = host.call("sync", json!({"since":0})).await;
+            let sync = common::snapshot(&host.base, &host.token).await;
             if final_entries.len() == 4
                 && sync["bots"].as_array().unwrap().iter().any(|b| b["id"] == bot && b["status"] == "idle")
             {

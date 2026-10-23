@@ -12,10 +12,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::app::{After, Msg};
 use super::manage::Reply;
-mod memory_transfer;
 
 /// Methods that start an agent or download something: they can take minutes.
-const SLOW: [&str; 8] = [
+const SLOW: [&str; 7] = [
     "agentAuth",
     "agentAuthenticate",
     "agentModels",
@@ -23,7 +22,6 @@ const SLOW: [&str; 8] = [
     "installConnector",
     "installSkill",
     "importConnectors",
-    "memory",
 ];
 
 pub const NOT_INSTALLED: &str = "The Codync host isn't set up on this computer yet.";
@@ -63,13 +61,7 @@ impl Client {
                 .post(format!("{}/api/{method}", self.base))
                 .bearer_auth(&token)
                 .json(body)
-                .timeout(Duration::from_secs(
-                    if SLOW.contains(&method) || method.starts_with("memory") || method.ends_with("Memory") {
-                        11 * 60
-                    } else {
-                        60
-                    },
-                ))
+                .timeout(Duration::from_secs(if SLOW.contains(&method) { 11 * 60 } else { 60 }))
                 .send()
                 .await;
             match sent {
@@ -88,15 +80,28 @@ impl Client {
         if ok { Ok(v) } else { Err(v["error"].as_str().unwrap_or("The host refused that.").to_owned()) }
     }
 
+    /// Sends a panic of this terminal UI to the host (`reportError`) before the process ends:
+    /// from a thread and runtime of its own, since the panicking thread may be driving this one.
+    pub fn report_panic(&self, info: &std::panic::PanicHookInfo<'_>) {
+        use crate::analytics::errors::{Process, Report};
+        let (Some(token), Ok(body)) = (self.token(), serde_json::to_value(Report::panic(info, Process::Tui))) else {
+            return;
+        };
+        let url = format!("{}/api/reportError", self.base);
+        let _ = std::thread::spawn(move || {
+            let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build() else { return };
+            let sent =
+                reqwest::Client::new().post(url).bearer_auth(token).json(&body).timeout(Duration::from_secs(3)).send();
+            let _ = rt.block_on(sent);
+        })
+        .join();
+    }
+
     /// Runs a command in the background; the reply comes back as `Msg::Reply`.
     pub fn spawn_call(&self, method: &'static str, body: Value, after: After, tx: UnboundedSender<Msg>) {
         let c = self.clone();
         tokio::spawn(async move {
-            let r = if matches!(method, "exportMemory" | "importMemory") {
-                memory_transfer::call(&c, method, &body).await
-            } else {
-                c.call(method, &body).await
-            };
+            let r = c.call(method, &body).await;
             let _ = tx.send(Msg::Reply(after, r));
         });
     }

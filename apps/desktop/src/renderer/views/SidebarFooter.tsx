@@ -1,14 +1,15 @@
 import { ProfileAvatar } from './PanelMenus'
+import { UpdateBadge } from './UpdateButton'
 import gmail from '../assets/gmail.png'
 import calendar from '../assets/google-calendar.png'
 import drive from '../assets/google-drive.png'
 import './sidebar-footer.css'
 
 /** Account and app connections float above the scrolling roster. */
-export function SidebarFooter({ accountOpen, onAccount, onConnectApps }: {
+export function SidebarFooter({ accountOpen, onAccount, onExtensions }: {
   accountOpen: boolean
   onAccount: () => void
-  onConnectApps: () => void
+  onExtensions: () => void
 }) {
   return (
     <div className="sidebar-footer">
@@ -22,12 +23,13 @@ export function SidebarFooter({ accountOpen, onAccount, onConnectApps }: {
       >
         <ProfileAvatar />
       </button>
-      <button className="connect-apps" onClick={onConnectApps}>
-        <span>Connect apps</span>
-        <span className="connect-apps-logos" aria-hidden>
+      <button className="extensions" onClick={onExtensions}>
+        <span>Extensions</span>
+        <span className="extensions-logos" aria-hidden>
           {[gmail, calendar, drive].map((src) => <img key={src} src={src} alt="" draggable={false} />)}
         </span>
       </button>
+      <UpdateBadge size={34} />
     </div>
   )
 }

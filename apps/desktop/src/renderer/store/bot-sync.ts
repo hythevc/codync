@@ -11,6 +11,16 @@ const MISMATCH_RECHECK = 30_000
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const same = (a: Connection, b: Connection) => a.kind === b.kind && JSON.stringify(a) === JSON.stringify(b)
 
+/** Each chat's entries that `keep` accepts; chats left empty go. */
+function keptEntries(entries: Map<string, Entry[]>, keep: (e: Entry) => boolean) {
+  const kept = new Map<string, Entry[]>()
+  for (const [id, list] of entries) {
+    const rest = list.filter(keep)
+    if (rest.length) kept.set(id, rest)
+  }
+  return kept
+}
+
 /**
  * The link half of `BotStore`: the events stream (catch-up since `rev`, then live), connection
  * graces, waiting for the link before an action, and read acknowledgements.
@@ -24,7 +34,7 @@ export class BotSync extends BotMirror {
   /** The `since` the current events connection asked for, and the per-bot floors snapshotted at its `hello`. */
   private requestedSince = 0
   private floors = new Map<string, number>()
-  private readingViews = new Map<string, { botId: string; thread: string | null }>()
+  private readingViews = new Map<string, string>()
 
   // MARK: lifecycle
 
@@ -90,7 +100,7 @@ export class BotSync extends BotMirror {
       this.connection = next
       this.changed()
     }
-    if (recovering) for (const scope of this.readingViews.values()) this.markRead(scope.botId, scope.thread)
+    if (recovering) for (const botId of new Set(this.readingViews.values())) this.markRead(botId)
   }
 
   /** Events (catch-up since `rev`, then live) for as long as the store lives. */
@@ -123,7 +133,7 @@ export class BotSync extends BotMirror {
           this.floors = new Map()
           this.closeEvents = client.events(
             this.requestedSince,
-            this.clientKind,
+            'desktop',
             (event) => {
               if (!alive()) return
               this.setConnection({ kind: 'online' })
@@ -167,7 +177,7 @@ export class BotSync extends BotMirror {
     const cached = this.cacheStamp !== null && this.cacheStamp !== `${this.appVersion}/${next.version}`
     if (cached || (this.hostVersion && this.hostVersion.version !== next.version)) {
       // A different host version or app build: data may carry new fields, so fetch it all again.
-      this.rev = 0
+      this.refetchAll()
       this.rewound = false
       this.unreadable = false
     }
@@ -225,7 +235,7 @@ export class BotSync extends BotMirror {
         // Never skip past data we couldn't read: rewind once and fetch everything again.
         if (!this.rewound) {
           this.rewound = true
-          this.rev = 0
+          this.refetchAll()
           this.restartEvents()
         } else if (!this.unreadable) {
           this.unreadable = true
@@ -240,12 +250,7 @@ export class BotSync extends BotMirror {
   private resetMirror() {
     this.composerDrafts.clear()
     this.bots = new Map()
-    const kept = new Map<string, Entry[]>()
-    for (const [id, list] of this.entries) {
-      const local = list.filter((e) => e.id.startsWith('local-'))
-      if (local.length) kept.set(id, local)
-    }
-    this.entries = kept
+    this.entries = keptEntries(this.entries, (e) => e.id.startsWith('local-'))
     this.selection = null
     this.onRosterChanged?.()
     this.rev = 0
@@ -254,6 +259,17 @@ export class BotSync extends BotMirror {
     this.floors = new Map()
     this.screen = null
     this.saveCache()
+  }
+
+  /**
+   * Fetches everything again from rev 0. That catch-up brings only each chat's newest entries, so the
+   * main-chat ones held now go too: an older one kept would hide the gap from `loadOlder`, which pages
+   * from the oldest one held. Messages still sending stay.
+   */
+  private refetchAll() {
+    this.rev = 0
+    this.entries = keptEntries(this.entries, (e) => e.id.startsWith('local-'))
+    this.historyComplete = new Set()
   }
 
   private isBelowFloor(e: Entry) {
@@ -338,10 +354,10 @@ export class BotSync extends BotMirror {
   }
 
   /** Views register while visible. Multiple windows may read the same conversation. */
-  setReading(token: string, botId: string, thread: string | null, active: boolean) {
+  setReading(token: string, botId: string, active: boolean) {
     if (active) {
-      this.readingViews.set(token, { botId, thread })
-      if (this.connection.kind === 'online') this.markRead(botId, thread)
+      this.readingViews.set(token, botId)
+      if (this.connection.kind === 'online') this.markRead(botId)
     } else {
       this.readingViews.delete(token)
     }
@@ -349,24 +365,17 @@ export class BotSync extends BotMirror {
 
   private acknowledgeVisible(botId: string, entry?: Entry) {
     if (this.connection.kind !== 'online') return
-    const seen = new Set<string>()
-    for (const scope of this.readingViews.values()) {
-      if (scope.botId !== botId) continue
-      if (entry && (!isChat(entry) || (entry.threadId ?? null) !== scope.thread)) continue
-      const key = `${scope.botId}/${scope.thread}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      this.markRead(botId, scope.thread)
-    }
+    if (![...this.readingViews.values()].includes(botId) || (entry && !isChat(entry))) return
+    this.markRead(botId)
   }
 
-  markRead(botId: string, thread: string | null = null) {
+  markRead(botId: string) {
     void (async () => {
       if (!this.live) await sleep(INITIAL_GRACE)
       const client = this.live
       if (!client) return
       try {
-        await client.call('markRead', { botId, threadId: thread, all: false })
+        await client.call('markRead', { botId })
       } catch {
         // The visible scope is acknowledged again when the link recovers.
       }

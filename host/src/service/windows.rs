@@ -19,6 +19,11 @@ const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 /// dies with it, and the service must outlive the app that installed it).
 const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
+/// Whether the service runner (`codync-hostw.exe`) started this process; it sets `CODYNC_SERVICE`.
+pub fn started_by_service() -> bool {
+    std::env::var_os("CODYNC_SERVICE").is_some()
+}
+
 /// Stops the running service. Its configuration stays for a later start; a
 /// manually started `codync-host serve` is left alone.
 pub fn stop() -> Result<()> {
@@ -33,7 +38,17 @@ pub fn stop() -> Result<()> {
 
 pub fn start() -> Result<()> {
     let (program, args) = configured()?;
-    let spawn = |flags| Command::new(&program).args(&args).creation_flags(flags).spawn();
+    // No inherited pipes: the supervisor never exits, and whoever ran `install` (the app) would
+    // wait on them forever.
+    let spawn = |flags| {
+        Command::new(&program)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .creation_flags(flags)
+            .spawn()
+    };
     let detached = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
     spawn(detached | CREATE_BREAKAWAY_FROM_JOB)
         .or_else(|_| spawn(detached))

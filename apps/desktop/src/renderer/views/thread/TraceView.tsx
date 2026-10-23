@@ -1,80 +1,92 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { Entry, EntryData } from '@shared/models'
+import { isWorkingIn, type Entry, type EntryData } from '@shared/models'
 import { CardSection, Disclosure } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { ModalHeader } from '../../components/Overlay'
-import { ThinkingOrb } from '../../components/ThinkingOrb'
-import { font } from '../../lib/fonts'
+import { ModalHeader, SheetPage } from '../../components/Overlay'
+import { HStack, IconSlot, VStack } from '../../components/Stack'
+import { Text, type Tone } from '../../components/Text'
+import { ThinkingOrb, type OrbState } from '../../components/ThinkingOrb'
+import type { Weight } from '../../lib/fonts'
 import { useStore } from '../../store/context'
+import { useScreenViewed } from '../../store/analytics'
 import { MarkdownText } from './Markdown'
 import { CodeBox, DiffView } from './PermissionCard'
+import { runningTurn, scrolledToEnd, traceTurns } from './trace-turns'
+import './trace.css'
 
 /**
  * "Full conversation": everything the agent did (narration, thinking, tool calls with output
- * and diffs, plans) grouped by turn. A chat's trace, or one thread's (`thread`: its root).
+ * and diffs, plans) grouped by turn.
  */
-export function TraceView({ botId, thread = null }: { botId: string; thread?: string | null }) {
+export function TraceView({ botId }: { botId: string }) {
   const store = useStore()
-  const turns = new Map<number, Entry[]>()
-  for (const e of store.allEntries(botId)) {
-    if ((e.threadId ?? null) !== thread) continue
-    turns.set(e.turn, [...(turns.get(e.turn) ?? []), e])
-  }
-  const sorted = [...turns.entries()].sort((a, b) => a[0] - b[0])
+  useScreenViewed('trace')
+  const all = store.allEntries(botId)
+  const sorted = traceTurns(all)
+  // The running turn's thoughts start unfolded.
+  const bot = store.bots.get(botId)
+  const running = runningTurn(all, !!bot && isWorkingIn(bot, botId))
   const scroller = useRef<HTMLDivElement>(null)
+  // Opens at the end and follows new steps there until the reader scrolls up.
+  const atEnd = useRef(true)
   useLayoutEffect(() => {
     const el = scroller.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [])
+    if (el && atEnd.current) el.scrollTop = el.scrollHeight
+  })
+  const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    atEnd.current = scrolledToEnd(e.currentTarget)
+  }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
+    <SheetPage>
       <ModalHeader title="Full conversation" />
-      <div ref={scroller} style={{ flex: 1, overflowY: 'auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14, fontSize: 'calc(12px * var(--scale))' }}>
-          {sorted.length === 0 ? <span style={{ color: 'var(--tertiary)' }}>Nothing yet.</span> : null}
+      <div ref={scroller} className="thread-scroll" onScroll={onScroll}>
+        <VStack gap={14} className="trace-content">
+          {sorted.length === 0 ? <Text tone="tertiary">Nothing yet.</Text> : null}
           {sorted.map(([turn, entries]) => (
-            <div key={turn} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ ...font('compactSecondary', 'semibold'), color: 'var(--text)', paddingLeft: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <VStack key={turn} gap={8}>
+              <Text as="div" size="compactSecondary" weight="semibold" tone="text" truncate className="trace-turn-title">
                 {entries.find((e) => e.kind === 'user')?.data.text ?? `Turn ${turn}`}
-              </div>
+              </Text>
               <CardSection>
                 {entries.map((e) => (
-                  <TraceRow key={e.id} entry={e} />
+                  <TraceRow key={e.id} entry={e} unfolded={turn === running} />
                 ))}
               </CardSection>
-            </div>
+            </VStack>
           ))}
-        </div>
+        </VStack>
       </div>
-    </div>
+    </SheetPage>
   )
 }
 
-function Label({ icon, children, style }: { icon: React.ReactNode; children: React.ReactNode; style?: React.CSSProperties }) {
+/** An icon centered on the first line of caption text beside it. */
+function Label({ icon, weight, tone, children }: { icon: React.ReactNode; weight?: Weight; tone?: Tone; children: React.ReactNode }) {
   return (
-    <span style={{ display: 'flex', alignItems: 'flex-start', gap: 6, ...style }}>
-      <span style={{ display: 'flex', alignItems: 'center', minHeight: '1.25em' }}>{icon}</span>
-      <span style={{ minWidth: 0 }}>{children}</span>
-    </span>
+    <HStack as="span" align="flex-start" gap={6}>
+      <HStack as="span" className="trace-label-icon">{icon}</HStack>
+      <Text size="caption" weight={weight} tone={tone} className="trace-label-text">{children}</Text>
+    </HStack>
   )
 }
 
-function TraceRow({ entry }: { entry: Entry }) {
-  const [expanded, setExpanded] = useState(false)
+/** The running turn's thoughts start `unfolded`, so its reasoning reads as it comes in. */
+function TraceRow({ entry, unfolded }: { entry: Entry; unfolded: boolean }) {
+  const [expanded, setExpanded] = useState(unfolded)
   const d = entry.data
   switch (entry.kind) {
     case 'user':
       return (
-        <Label icon={<Icon name="person.fill" size={11} color="var(--secondary)" />} style={font('subheadline')}>
-          <span style={{ color: 'var(--text)' }}>{d.text ?? ''}</span>
+        <Label icon={<Icon name="person.fill" size={11} color="var(--secondary)" />} tone="text">
+          {d.text ?? ''}
         </Label>
       )
     case 'agent':
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ ...font('caption2', 'semibold'), color: 'var(--tertiary)' }}>{d.final ? 'Reply' : 'Said'}</span>
+        <VStack gap={4}>
+          <Text size="caption2" weight="semibold" tone="tertiary">{d.final ? 'Reply' : 'Said'}</Text>
           <MarkdownText text={d.text ?? ''} />
-        </div>
+        </VStack>
       )
     case 'thought':
       return (
@@ -82,27 +94,27 @@ function TraceRow({ entry }: { entry: Entry }) {
           expanded={expanded}
           onToggle={() => setExpanded((x) => !x)}
           label={
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, ...font('subheadline'), color: 'var(--secondary)' }}>
+            <HStack as="span" gap={6}>
               <ThinkingOrb size={16} color="var(--secondary)" animated={false} />
-              Thinking
-            </span>
+              <Text size="subheadline" tone="secondary">Thinking</Text>
+            </HStack>
           }
         >
-          <div className="selectable" style={{ ...font('footnote'), color: 'var(--secondary)', whiteSpace: 'pre-wrap' }}>{d.text ?? ''}</div>
+          <Text as="div" size="footnote" tone="secondary" className="selectable trace-thought">{d.text ?? ''}</Text>
         </Disclosure>
       )
     case 'tool':
       return <ToolRow data={d} />
     case 'plan':
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <Label icon={<Icon name="checklist" size={11} weight="bold" />} style={font('subheadline', 'bold')}>
+        <VStack gap={6}>
+          <Label icon={<Icon name="checklist" size={11} weight="bold" />} weight="bold">
             Plan
           </Label>
           {(d.entries ?? []).map((item, i) => (
             <Label
               key={i}
-              style={font('footnote')}
+              tone="text"
               icon={
                 <Icon
                   name={item.status === 'completed' ? 'checkmark.circle.fill' : item.status === 'in_progress' ? 'circle.dotted' : 'circle'}
@@ -111,50 +123,52 @@ function TraceRow({ entry }: { entry: Entry }) {
                 />
               }
             >
-              <span style={{ color: 'var(--text)', textDecoration: item.status === 'completed' ? 'line-through' : undefined }}>{item.content}</span>
+              <span className={item.status === 'completed' ? 'trace-plan-done' : undefined}>{item.content}</span>
             </Label>
           ))}
-        </div>
+        </VStack>
       )
     case 'permission':
       return (
-        <Label icon={<Icon name="hand.raised" size={11} />} style={{ ...font('subheadline'), color: 'var(--secondary)' }}>
+        <Label icon={<Icon name="hand.raised" size={11} color="var(--secondary)" />} tone="secondary">
           {d.title ?? 'Approval'}
         </Label>
       )
     default:
-      return <span style={{ ...font('footnote'), color: 'var(--tertiary)' }}>{d.text ?? ''}</span>
+      return <Text size="footnote" tone="tertiary">{d.text ?? ''}</Text>
   }
 }
 
 const toolIcon = (kind?: string) =>
   ({ read: 'doc.text', edit: 'pencil', delete: 'trash', move: 'arrow.right.doc.on.clipboard', search: 'magnifyingglass', execute: 'terminal', think: 'brain', fetch: 'globe' })[kind ?? ''] ?? 'wrench.and.screwdriver'
 
+const toolOrb = (kind?: string): OrbState => ({ search: 'searching', fetch: 'connecting', edit: 'shaping' } as const)[kind ?? ''] ?? 'working'
+
 export function ToolRow({ data }: { data: EntryData }) {
   const [expanded, setExpanded] = useState(false)
   const hasBody = !!data.output || !!data.diffs?.length
   const label = (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 8, ...font('caption'), flex: 1, minWidth: 0 }}>
-      <span style={{ width: 18, display: 'flex', justifyContent: 'center', color: 'var(--secondary)' }}>
+    <HStack as="span" gap={8} grow>
+      <IconSlot width={18} tone="secondary">
         <Icon name={toolIcon(data.toolKind)} size={10} />
-      </span>
-      <span style={{ ...font('subheadline'), color: 'var(--text)', flex: 1, minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{data.title ?? 'Tool'}</span>
+      </IconSlot>
+      <Text size="subheadline" tone="text" lines={2} grow>{data.title ?? 'Tool'}</Text>
       {data.status === 'completed' ? (
         <Icon name="checkmark" size={10} color="var(--accent)" />
       ) : data.status === 'failed' ? (
         <Icon name="xmark" size={10} color="var(--danger)" />
       ) : (
-        <ThinkingOrb state={data.toolKind === 'search' ? 'searching' : data.toolKind === 'fetch' ? 'connecting' : 'working'} size={16} color="var(--secondary)" />
+        <ThinkingOrb state={toolOrb(data.toolKind)} size={16} color="var(--secondary)" />
       )}
-    </span>
+    </HStack>
   )
   if (!hasBody) return label
   return (
     <Disclosure expanded={expanded} onToggle={() => setExpanded((x) => !x)} label={label}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <VStack gap={8}>
         {(data.diffs ?? []).map((diff, i) => <DiffView key={i} diff={diff} />)}
         {data.output ? <CodeBox text={data.output} /> : null}
-      </div>
+      </VStack>
     </Disclosure>
   )
 }

@@ -1,19 +1,27 @@
-import { useEffect, useState } from 'react'
-import type { UpdateState } from '@shared/ipc'
-import { Button, CardForm, CardSection, ChoicePicker, IconButton, Switch, ValueRow } from '../../components/Controls'
+import { Fragment, useEffect, useState } from 'react'
+import type { Screen } from '@shared/analytics'
+import { APPEARANCES, type Appearance } from '@shared/appearance'
+import { islandLabel } from '@shared/island'
+import { VOICE_SHORTCUTS, type VoiceShortcut } from '@shared/voice-shortcut'
+import { Button, CardForm, CardSection, ChoicePicker, IconButton, ProgressBar, Switch, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { useDismiss } from '../../components/Overlay'
-import { font } from '../../lib/fonts'
+import { HStack, IconSlot, VStack } from '../../components/Stack'
+import { Text } from '../../components/Text'
 import { useModel } from '../../lib/observable'
 import { DEFAULT_TEXT_SIZE, prefs, TEXT_SIZES, usePref } from '../../lib/prefs'
 import { useAccount } from '../../store/account'
+import { useScreenViewed } from '../../store/analytics'
 import { StoreContext, useApp } from '../../store/context'
 import { ComputerBadge } from '../ComputerBadge'
+import { UpdateButton, useUpdates } from '../UpdateButton'
 import { ComputersView } from './ComputersView'
 import { errorText, isMac, thisMac } from './parts'
 import { UsageLimits } from './UsageLimits'
 import { VoiceChatSettingsView } from './VoiceChatSettingsView'
 import { ComputerAccessView } from '../computer-access/ComputerAccessView'
+import { FormSheet } from '../marketplace/pieces'
+import { AnalyticsSheet } from './AnalyticsSheet'
 
 /** The chat window's Settings: pages in a sidebar, ChatGPT's settings layout. */
 export type SettingsPage = 'general' | 'computers' | 'access' | 'voice' | 'usage' | 'updates'
@@ -28,35 +36,39 @@ const pages: { id: SettingsPage; title: string; label?: string; group: string; i
   { id: 'updates', title: 'Updates', group: thisComputer, icon: 'arrow.down.circle' },
 ]
 
+/** Each page as `screen_viewed` names it; Computer access and Voice chat report themselves. */
+const pageScreens: Record<SettingsPage, Screen | null> = { general: 'settings', updates: 'settings', computers: 'computers', usage: 'usage', access: null, voice: null }
+
 export function SettingsView({ page: initial }: { page: SettingsPage }) {
   // Kept here: the sheet's content doesn't follow the window's state once shown.
   const [page, setPage] = useState(initial)
   const app = useApp()
   const dismiss = useDismiss()
   const current = pages.find((p) => p.id === page)!
+  useScreenViewed(pageScreens[page])
   return (
     <div className="settings">
       <nav className="settings-sidebar">
         {['Personal', thisComputer].map((group) => (
-          <div key={group} style={{ display: 'contents' }}>
-            <div className="settings-group" style={{ paddingTop: group === 'Personal' ? 0 : 16 }}>{group}</div>
+          <Fragment key={group}>
+            <div className="settings-group">{group}</div>
             {pages.filter((p) => p.group === group).map((item) => (
-              <button key={item.id} className={`settings-item ${item.id === page ? 'selected' : ''}`} aria-selected={item.id === page} onClick={() => setPage(item.id)}>
-                <span style={{ width: 18, display: 'flex', justifyContent: 'center', color: 'var(--secondary)' }}>
+              <button key={item.id} className={`settings-item ${item.id === page ? 'selected' : ''}`} aria-current={item.id === page ? 'page' : undefined} onClick={() => setPage(item.id)}>
+                <IconSlot width={18} tone="secondary">
                   <Icon name={item.icon} size={13} />
-                </span>
-                <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label ?? item.title}</span>
+                </IconSlot>
+                <Text truncate grow>{item.label ?? item.title}</Text>
                 {item.id === 'computers' && app.approvals.length > 0 ? (
-                  <span style={{ ...font(11, 'semibold'), color: 'var(--secondary)' }}>{app.approvals.length}</span>
+                  <Text size="caption" weight="semibold" tone="secondary">{app.approvals.length}</Text>
                 ) : null}
               </button>
             ))}
-          </div>
+          </Fragment>
         ))}
       </nav>
       <div className="settings-divider" />
       <div className="settings-main">
-        <div style={{ ...font(24, 'semibold'), color: 'var(--text)', padding: '30px 32px 8px' }}>{current.title}</div>
+        <Text as="div" size={24} weight="semibold" tone="text" className="settings-title">{current.title}</Text>
         <div key={page} className="settings-page">
           <PageContent page={page} />
         </div>
@@ -84,7 +96,7 @@ function PageContent({ page }: { page: SettingsPage }) {
         </StoreContext.Provider>
       ) : (
         <CardForm>
-          <span style={{ color: 'var(--secondary)' }}>Voice keys are kept by {thisMac}'s host, which isn't running.</span>
+          <Text tone="secondary">Voice keys are kept by {thisMac}'s host, which isn't running.</Text>
         </CardForm>
       )
     case 'usage':
@@ -101,6 +113,8 @@ function PageContent({ page }: { page: SettingsPage }) {
 /** Account, window and app preferences. */
 function GeneralSettings() {
   const account = useAccount()
+  const [appearance, setAppearance] = useState<Appearance>('system')
+  useEffect(() => void window.codync.app.appearance().then(setAppearance), [])
   const [textSize, setTextSize] = usePref(prefs.textSize)
   const [usageIconStyle, setUsageIconStyle] = usePref(prefs.usageIconStyle)
   const [compact, setCompact] = usePref(prefs.sidebarCompact)
@@ -108,20 +122,24 @@ function GeneralSettings() {
   useEffect(() => void window.codync.app.showInDock().then(setShowInDock), [])
   const [launchAtLogin, setLaunchAtLogin] = useState(false)
   useEffect(() => void window.codync.app.launchAtLogin().then(setLaunchAtLogin), [])
+  const [island, setIsland] = useState(false)
+  useEffect(() => void window.codync.island.enabled().then(setIsland), [])
+  const [voiceShortcut, setVoiceShortcut] = useState<VoiceShortcut>('off')
+  useEffect(() => void window.codync.speech.shortcut().then(setVoiceShortcut), [])
 
   return (
     <CardForm>
       <CardSection title="Account" footer={account.errorMessage}>
         <div className="settings-row">
           <Icon name="person.crop.circle" size={26} color="var(--secondary)" />
-          <div className="settings-stack" style={{ flex: 1 }}>
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <VStack grow className="settings-stack">
+            <Text truncate>
               {account.isSignedIn ? (account.user?.email ?? 'Signed in') : 'Not signed in'}
-            </span>
-            <span style={{ ...font('caption'), color: 'var(--secondary)' }}>
+            </Text>
+            <Text size="caption" tone="secondary">
               {account.isSignedIn ? 'Reach your computers from anywhere' : 'Sign in to reach your computers from anywhere'}
-            </span>
-          </div>
+            </Text>
+          </VStack>
           {account.isSignedIn ? (
             <Button kind="secondary" onClick={() => void account.signOut()} disabled={account.isBusy}>
               {account.isBusy ? 'Please wait…' : 'Sign out'}
@@ -139,6 +157,9 @@ function GeneralSettings() {
         </div>
       </CardSection>
       <CardSection title="Appearance">
+        <ValueRow label="Theme">
+          <ChoicePicker selection={appearance} options={[...APPEARANCES]} onChange={(value) => void window.codync.app.setAppearance(value).then(setAppearance)} />
+        </ValueRow>
         <ValueRow label="Text size">
           <ChoicePicker
             selection={textSize}
@@ -155,6 +176,17 @@ function GeneralSettings() {
       </CardSection>
       <CardSection title="System">
         {window.codync.platform === 'darwin' ? <Switch on={showInDock} onChange={(on) => void window.codync.app.setShowInDock(on).then(setShowInDock)}>Show in Dock</Switch> : null}
+        {window.codync.island.supported ? (
+          <Switch on={island} onChange={(on) => void window.codync.island.setEnabled(on).then(setIsland)}>
+            {islandLabel(window.codync.platform)}
+          </Switch>
+        ) : null}
+        {/* On-device speech, so macOS only. */}
+        {window.codync.speech.available ? (
+          <ValueRow label="Voice input shortcut" detail="Talk to a bot from any app, then tap the key once more to send.">
+            <ChoicePicker selection={voiceShortcut} options={VOICE_SHORTCUTS} onChange={(s) => void window.codync.speech.setShortcut(s).then(setVoiceShortcut)} />
+          </ValueRow>
+        ) : null}
         <Switch on={launchAtLogin} onChange={(on) => void window.codync.app.setLaunchAtLogin(on).then(setLaunchAtLogin)}>
           Open at login
         </Switch>
@@ -169,13 +201,21 @@ function PrivacySettings() {
   const app = useApp()
   const local = useModel(app.local)
   const running = local !== null && local.connection.kind === 'online'
+  const [about, setAbout] = useState(false)
   const setShared = (on: boolean) => void local?.setAnalytics(on).catch((e: unknown) => app.setError(errorText(e)))
   return (
-    <CardSection title="Privacy" footer="Which features you use, never your messages, code or files. Private, used only to improve Codync.">
-      <Switch on={local?.analytics === true} onChange={setShared} disabled={!running}>
-        Share usage analytics
-      </Switch>
-    </CardSection>
+    <>
+      <CardSection title="Privacy" footer="Which features you use, never your messages, code or files. Helps us spot bugs sooner and make Codync better for you.">
+        <HStack gap={4}>
+          <span className={running ? undefined : 'settings-off'}>Share usage analytics</span>
+          <IconButton title="About usage analytics" icon="info.circle" onClick={() => setAbout(true)} />
+          <Switch on={local?.analytics === true} onChange={setShared} disabled={!running} label="Share usage analytics" className="settings-privacy-switch" />
+        </HStack>
+      </CardSection>
+      <FormSheet open={about} onClose={() => setAbout(false)}>
+        <AnalyticsSheet />
+      </FormSheet>
+    </>
   )
 }
 
@@ -184,15 +224,15 @@ function UsageLimitsList() {
   const app = useApp()
   const stores = app.computers.flatMap((c) => app.store(c.id) ?? [])
   const withUsage = stores.filter((s) => s.usage.providers.length > 0)
-  if (withUsage.length === 0) return <span style={{ color: 'var(--secondary)' }}>No usage information yet.</span>
+  if (withUsage.length === 0) return <Text tone="secondary">No usage information yet.</Text>
   return (
     <>
       {withUsage.flatMap((store) => [
         stores.length > 1 ? (
-          <div key={`${store.computer.id}-label`} style={{ ...font('headline'), display: 'flex', alignItems: 'center', gap: 6 }}>
+          <HStack key={`${store.computer.id}-label`} gap={6} className="settings-usage-computer">
             <ComputerBadge computer={store.computer} size={16} />
             {store.hostName}
-          </div>
+          </HStack>
         ) : null,
         <UsageLimits key={store.computer.id} usage={store.usage} />,
       ])}
@@ -202,17 +242,9 @@ function UsageLimitsList() {
 
 /** The app's update check and preferences, the same as the menu bar's Updates menu. */
 function UpdateSettings() {
-  const [updates, setUpdates] = useState<UpdateState | null>(null)
-  useEffect(() => {
-    void window.codync.updates.state().then(setUpdates)
-    return window.codync.updates.onChange(setUpdates)
-  }, [])
+  const updates = useUpdates()
   if (!updates) return null
-  const footer = !updates.supported
-    ? 'Updates are available in release builds.'
-    : updates.waitingForApp
-      ? `Waiting for iPhone app ${updates.waitingForApp} to pass App Store review.`
-      : null
+  const footer = updates.supported ? null : 'Updates are available in release builds.'
   const lastChecked = updates.lastCheck
     ? `Last checked ${new Date(updates.lastCheck).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
     : null
@@ -221,13 +253,18 @@ function UpdateSettings() {
       <CardSection title="Codync" footer={footer}>
         {[
           <ValueRow key="version" label="Version" detail={lastChecked}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <HStack as="span" gap={10}>
               <span>{window.codync.appVersion}</span>
-              <Button kind="secondary" onClick={() => window.codync.updates.check()} disabled={!updates.canCheck && !updates.staged}>
-                {updates.availableVersion ? `Update to ${updates.availableVersion}` : 'Check for updates'}
-              </Button>
-            </span>
+              <UpdateButton updates={updates} />
+            </HStack>
           </ValueRow>,
+          ...(updates.downloadPercent !== null
+            ? [
+                <div key="progress" className="settings-row settings-appear">
+                  <ProgressBar value={updates.downloadPercent / 100} label={`Downloading Codync ${updates.availableVersion ?? ''}`} />
+                </div>,
+              ]
+            : []),
           <Switch key="check" on={updates.autoCheck} onChange={(on) => window.codync.updates.setAutoCheck(on)} disabled={!updates.supported}>
             Automatically check for updates
           </Switch>,
@@ -237,7 +274,7 @@ function UpdateSettings() {
           ...(updates.error
             ? [
                 <div key="error" className="settings-row settings-appear">
-                  <span style={{ flex: 1, color: 'var(--warning)' }}>{updates.error}</span>
+                  <Text tone="attention" grow>{updates.error}</Text>
                   <Button kind="secondary" onClick={() => window.codync.updates.check()} disabled={updates.checking}>
                     Retry
                   </Button>

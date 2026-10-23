@@ -7,8 +7,6 @@ import SwiftUI
 public struct MarketplaceView: View {
     @Environment(BotStore.self) private var model
     @State private var search = ""
-    /// Bumped on each submitted search, so every section searches again.
-    @State private var searchToken = 0
     @State private var connectors = MarketplacePage<MarketConnector>()
     @State private var connectorRequest = UUID()
     @State private var connectorQuery = ""
@@ -23,7 +21,9 @@ public struct MarketplaceView: View {
     @State private var busySkill: String?
     @State private var addingConnector = false
     @State private var writingSkill = false
+    @State private var viewingSkill: SkillRef?
     @State private var agent: Backend?
+    @State private var addingNode = false
     /// Agents shown before "Load more agents".
     @State private var agentLimit = 10
     @State private var showInstalled = false
@@ -63,6 +63,7 @@ public struct MarketplaceView: View {
             }
         }
         .background(Palette.background)
+        .tracked(.screenViewed(.marketplace))
         .task {
             await model.refreshPlugins()
         }
@@ -78,8 +79,10 @@ public struct MarketplaceView: View {
         }
         .codyncSheet(isPresented: $showCredentials) { CredentialsView() }
         .codyncSheet(isPresented: $addingConnector) { CustomConnectorSheet() }
+        .codyncSheet(item: $viewingSkill) { SkillSheet(skill: $0) }
         .codyncSheet(isPresented: $writingSkill) { NewSkillSheet() }
         .codyncSheet(item: $agent) { b in AgentSheet(initial: b) }
+        .codyncSheet(isPresented: $addingNode) { SetupTerminalView(backend: nil, step: .node) { addingNode = false } }
     }
 
     private var page: some View {
@@ -89,6 +92,9 @@ public struct MarketplaceView: View {
                 searchField
                 if !agents.isEmpty {
                     MarketSection(title: query.isEmpty ? "Agents" : "Agents matching “\(query)”") {
+                        if model.hello?.backends.contains(where: \.needsNode) == true {
+                            NodeNotice { addingNode = true }
+                        }
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(spacing: 10) {
                                 ForEach(agents.prefix(agentLimit)) { b in agentCard(b).frame(width: 128) }
@@ -129,7 +135,6 @@ public struct MarketplaceView: View {
                         }
                     }
                 }
-                ComposioSection(query: query, searchToken: searchToken)
                 MarketSection(title: "Skills") {
                     if loadingSkills {
                         SkeletonGrid()
@@ -137,7 +142,8 @@ public struct MarketplaceView: View {
                         ItemGrid {
                             ForEach(shownSkills) { s in
                                 let added = s.installed || model.installedSkills.contains { $0.id == s.source.lowercased() }
-                                MarketRow(title: s.name, subtitle: s.description, added: added, busy: busySkill == s.source) {
+                                MarketRow(title: s.name, subtitle: s.description, added: added, busy: busySkill == s.source,
+                                          open: { viewingSkill = SkillRef(s, installed: added) }) {
                                     SkillGlyph()
                                 } add: {
                                     busySkill = s.source
@@ -171,7 +177,7 @@ public struct MarketplaceView: View {
                 if let error {
                     Text(error).font(.footnote).foregroundStyle(Palette.danger)
                 }
-                Text("Connectors come from the official MCP Registry, apps through Composio, skills from Anthropic, agents from the ACP registry. Everything installs on \(model.hostName).")
+                Text("Connectors come from the official MCP Registry, skills from Anthropic, agents from the ACP registry. Everything installs on \(model.hostName).")
                     .font(.footnote)
                     .foregroundStyle(Palette.tertiary)
             }
@@ -190,12 +196,12 @@ public struct MarketplaceView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .center) {
+        VStack(alignment: .leading, spacing: 16) {
             // Everything here lives on one computer; say which.
             HStack(spacing: 10) {
                 ComputerBadge(model.computer, size: 32)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("Marketplace")
+                    Text("Extensions")
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(Palette.text)
                     if let computer, computers.count > 1 {
@@ -224,7 +230,6 @@ public struct MarketplaceView: View {
                 .minimumScaleFactor(0.7)
             }
             .layoutPriority(1)
-            Spacer()
             if installedCount > 0 {
                 Button { withAnimation(Motion.layout) { showInstalled = true } } label: {
                     HStack(spacing: 8) {
@@ -233,7 +238,11 @@ public struct MarketplaceView: View {
                                 ServiceLogo(website: nil, name: c.name, registryName: c.registryName, size: 26)
                             }
                         }
-                        Text("\(installedCount) installed").foregroundStyle(Palette.secondary).lineLimit(1).fixedSize()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(installedCount) installed")
+                            Text("Connectors & skills").font(.caption)
+                        }
+                        .foregroundStyle(Palette.secondary)
                         Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.tertiary)
                     }
                     .contentShape(Rectangle())
@@ -250,10 +259,10 @@ public struct MarketplaceView: View {
             TextField("Search agents, connectors and skills", text: $search)
                 .textFieldStyle(.plain)
                 .plainTextInput()
-                .onSubmit { searchToken += 1; Task { await loadConnectors() } }
+                .onSubmit { Task { await loadConnectors() } }
                 .onChange(of: search) { agentLimit = 10 }
             if !search.isEmpty {
-                Button { search = ""; searchToken += 1; Task { await loadConnectors() } } label: {
+                Button { search = ""; Task { await loadConnectors() } } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(Palette.tertiary)
                 }
                 .buttonStyle(.plain)

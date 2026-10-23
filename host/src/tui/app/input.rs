@@ -6,8 +6,8 @@ use serde_json::json;
 
 use super::editor::move_line;
 use super::{
-    After, App, Click, Confirm, ConfirmAct, Editor, Field, Focus, Goto, GroupField, Kind, Mark, Overlay, PendingSend,
-    Status, TraceMode, Width, mismatch_text, page, tilde,
+    After, App, Click, Confirm, ConfirmAct, Editor, Field, Focus, Goto, GroupField, Kind, Mark, NewBotField, Overlay,
+    PendingSend, Status, TraceMode, Width, mismatch_text, page, tilde,
 };
 
 impl App {
@@ -19,13 +19,15 @@ impl App {
         let s = s.replace("\r\n", "\n").replace('\r', "\n");
         if let Some(ed) = self.top_editor() {
             ed.insert(&s);
-        } else if let Some(key) = self.draft_key() {
+        } else if let Some(key) = self.selected.clone() {
             self.typing = true;
             self.focus = Focus::Chat;
             // A file dragged onto the terminal pastes its path: attach it.
-            match dropped_files(&s) {
-                Some(paths) => self.files.entry(key).or_default().extend(paths),
-                None => self.drafts.entry(key).or_default().insert(&s),
+            if let Some(paths) = dropped_files(&s) {
+                self.files.entry(key).or_default().extend(paths);
+            } else {
+                self.drafts.entry(key.clone()).or_default().insert(&s);
+                self.pasted.entry(key).or_default().push(s);
             }
         }
     }
@@ -34,7 +36,7 @@ impl App {
         match self.overlays.last_mut()? {
             Overlay::Goto(g) => Some(&mut g.query),
             Overlay::Help(e) => Some(e),
-            Overlay::Agents(a) => Some(&mut a.query),
+            Overlay::NewBot(n) => (n.field == NewBotField::Name).then_some(&mut n.name),
             Overlay::Folder(p) => Some(&mut p.query),
             Overlay::Group(g) => match g.field {
                 GroupField::Name => Some(&mut g.name),
@@ -49,7 +51,6 @@ impl App {
             },
             Overlay::Market(m) => Some(&mut m.query),
             Overlay::Fields(f) => f.current().map(|i| &mut i.ed),
-            Overlay::Memory(m) => m.editor(),
             Overlay::Routine(f) => Some(match f.field {
                 super::super::manage::RoutineField::Name => &mut f.name,
                 super::super::manage::RoutineField::Instruction => &mut f.instruction,
@@ -85,13 +86,16 @@ impl App {
     }
 
     fn composer_key(&mut self, k: KeyEvent) {
-        let (Some(id), Some(key)) = (self.selected.clone(), self.draft_key()) else {
+        let Some(key) = self.selected.clone() else {
             self.typing = false;
             return;
         };
+        if self.slash_key(k) {
+            return;
+        }
         let ctrl = k.modifiers.contains(KeyModifiers::CONTROL);
         let newline = k.modifiers.intersects(KeyModifiers::SHIFT | KeyModifiers::ALT);
-        let thread = self.thread.clone();
+        let reply = self.reply.clone();
         let draft = self.drafts.entry(key.clone()).or_default();
         match k.code {
             KeyCode::Esc => self.typing = false,
@@ -101,6 +105,9 @@ impl App {
                 let text = draft.text.trim().to_owned();
                 let files = self.files.get(&key).cloned().unwrap_or_default();
                 if text.is_empty() && files.is_empty() {
+                    return;
+                }
+                if files.is_empty() && self.built_in_command(&text) {
                     return;
                 }
                 if let Some(m) = &self.mismatch {
@@ -123,9 +130,12 @@ impl App {
                     PendingSend { text: text.clone(), files: files.clone(), nonce: nonce.clone(), busy: true },
                 );
                 self.chat_scroll = 0;
-                let mut body = json!({"botId": id, "text": text, "clientNonce": nonce});
-                if let Some(root) = thread {
-                    body["threadId"] = root.into();
+                let mut body = json!({"botId": key, "text": text, "clientNonce": nonce});
+                if let Some(reply) = reply {
+                    body["replyTo"] = reply.into();
+                }
+                if let Some(pasted) = self.pasted.get(&key).filter(|p| !p.is_empty()) {
+                    body["pasted"] = json!(pasted);
                 }
                 let after = After::Sent(key);
                 if files.is_empty() {
@@ -157,6 +167,7 @@ impl App {
                 draft.key(k);
             }
         }
+        self.slash_typed();
     }
 
     pub(super) fn scroll_chat(&mut self, delta: isize) {
@@ -181,12 +192,15 @@ impl App {
             KeyCode::Char('u') if ctrl => self.scroll_focused(half),
             KeyCode::Char('q') => self.quit = true,
             KeyCode::Char('C') => self.open_connection(),
+            KeyCode::Char('F') => self.retry_failed_run(),
             KeyCode::Char('I') if self.error.is_some() && self.bots.is_empty() => self.install_host(),
             KeyCode::Char('?') => self.overlays.push(Overlay::Help(Editor::default())),
             KeyCode::Char('!') => self.jump(Mark::Need),
             KeyCode::Char('u') => self.jump(Mark::Unread),
             KeyCode::Char('[') => self.move_bot(-1),
             KeyCode::Char(']') => self.move_bot(1),
+            KeyCode::Char('K') => self.reorder_bot(-1),
+            KeyCode::Char('J') => self.reorder_bot(1),
             KeyCode::Char(c @ '1'..='9') => {
                 let i = (c as usize) - ('1' as usize);
                 let pending = if roster_page { None } else { self.pending().map(|e| (e.id.clone(), e.options())) };
@@ -209,15 +223,6 @@ impl App {
             KeyCode::Char('n') => self.new_bot(),
             KeyCode::Char('m') => self.new_group(),
             KeyCode::Char('i') if !roster_page => self.start_typing(),
-            KeyCode::Char('r') if !roster_page && self.selected.is_some() => {
-                if self.thread.is_some() {
-                    self.start_typing();
-                } else {
-                    self.chat_page = true;
-                    self.focus = Focus::Chat;
-                    self.step_pick(0);
-                }
-            }
             KeyCode::Enter => {
                 if roster_page || self.focus == Focus::Roster {
                     if self.selected.is_some() {
@@ -233,11 +238,8 @@ impl App {
                 if self.trace == TraceMode::Full {
                     self.trace = TraceMode::Off;
                     self.focus = Focus::Chat;
-                } else if self.thread.is_some() {
-                    self.thread = None;
-                    self.chat_scroll = 0;
-                    self.trace_turn = None;
-                    self.trace_scroll = 0;
+                } else if self.reply.is_some() {
+                    self.reply = None;
                 } else if narrow && self.chat_page {
                     self.chat_page = false;
                     self.focus = Focus::Roster;
@@ -305,7 +307,7 @@ impl App {
             KeyCode::Char('M') => self.open_memory(),
             KeyCode::Char('R') => self.open_routines(),
             KeyCode::Char('A') => self.open_market(),
-            KeyCode::Char('v') if !roster_page && self.selected.is_some() => {
+            KeyCode::Char('r' | 'v') if !roster_page && self.selected.is_some() => {
                 self.chat_page = true;
                 self.focus = Focus::Chat;
                 self.step_pick(0);
@@ -405,7 +407,6 @@ impl App {
                         }
                     }
                     Some(Click::Composer) => self.start_typing(),
-                    Some(Click::Thread(root)) => self.open_thread(root),
                     Some(Click::BotChat(entry)) => self.open_bot_chat(&entry),
                     None => {
                         if self.overlays.is_empty() {

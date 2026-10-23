@@ -1,8 +1,7 @@
 import type { SSHProfile } from '../shared/ssh.ts'
 
-// Preserve the login shell's PATH, then try the supported installers and Mac app layouts.
-// Resources is the Electron bundle; MacOS keeps older native app installs reachable.
-const REMOTE_PATH = '$PATH:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:/Applications/Codync.app/Contents/Resources:/Applications/Codync.app/Contents/MacOS'
+// Preserve the login shell's PATH, then try the supported installers and the Mac app bundle.
+const REMOTE_PATH = '$PATH:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:/Applications/Codync.app/Contents/Resources'
 
 /** The caller validates the port before constructing the remote shell command. */
 export const remoteInfoCommand = (port: number, folder = '.codync') => {
@@ -14,11 +13,15 @@ export const remoteInfoCommand = (port: number, folder = '.codync') => {
   return `sh -lc 'PATH="${REMOTE_PATH}" codync-host info --json --port ${port}'`
 }
 
-export const knownHostsFiles = (h: string, folder = '.codync') => [`${h}/.ssh/known_hosts`, `${h}/${folder}/ssh_known_hosts`]
+/** `dir` is this app's host data folder (`~/.codync`, or a development sandbox's). */
+export const knownHostsFiles = (h: string, dir = `${h}/.codync`) => [`${h}/.ssh/known_hosts`, `${dir}/ssh_known_hosts`]
+
+/** `pkill -f` pattern for the tunnels that use `dir`'s known_hosts file: this copy's own, never another copy's. */
+export const orphanTunnelPattern = (dir: string) => `^/usr/bin/ssh -N .*${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/ssh_known_hosts`
 
 /** ssh's config tokenizer splits `UserKnownHostsFile` on spaces, so each path carries literal quotes. */
-export const hostKeyOptions = (h: string, folder = '.codync') => [
-  '-o', 'UserKnownHostsFile=' + knownHostsFiles(h, folder).map((f) => `"${f}"`).join(' '),
+export const hostKeyOptions = (h: string, dir?: string) => [
+  '-o', 'UserKnownHostsFile=' + knownHostsFiles(h, dir).map((f) => `"${f}"`).join(' '),
   '-o', 'StrictHostKeyChecking=yes',
 ]
 
@@ -38,19 +41,19 @@ export function resolveArguments(p: SSHProfile) {
 }
 
 /** The remote command is fixed; only the validated port number goes into it. */
-export const infoArguments = (p: SSHProfile, h: string, folder = '.codync') => [
+export const infoArguments = (p: SSHProfile, h: string, folder = '.codync', dir = `${h}/${folder}`) => [
   '-T', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'ForwardAgent=no', '-o', 'ForwardX11=no',
-  ...hostKeyOptions(h, folder), ...targetOptions(p),
+  ...hostKeyOptions(h, dir), ...targetOptions(p),
   '--', p.host, remoteInfoCommand(p.remotePort, folder),
 ]
 
-export const tunnelArguments = (p: SSHProfile, localPort: number, h: string, folder = '.codync') => [
+export const tunnelArguments = (p: SSHProfile, localPort: number, h: string, dir?: string) => [
   '-N', '-T', '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
   // A shared master owns the listener and lets this child exit. The app must own
   // its tunnel process to verify the listener and close the forward on disconnect.
   '-S', 'none',
   '-o', 'ForwardAgent=no', '-o', 'ForwardX11=no', '-o', 'BatchMode=yes',
-  ...hostKeyOptions(h, folder),
+  ...hostKeyOptions(h, dir),
   '-L', `127.0.0.1:${localPort}:127.0.0.1:${p.remotePort}`,
   ...targetOptions(p), '--', p.host,
 ]

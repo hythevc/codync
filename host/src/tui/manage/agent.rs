@@ -7,8 +7,17 @@ use super::super::app::{After, App, Editor, Overlay};
 use super::{AgentSetup, Fields, Input, Reply, SetupRow, Submit, ctrl, s};
 
 impl App {
-    pub fn open_agent(&mut self, backend: &str) {
-        let known = self.backends.iter().find(|b| b["id"] == backend).is_some_and(|b| b["signedIn"] == true);
+    /// What the user calls agent `id` on this computer ("Claude Code").
+    pub fn agent_name(&self, id: &str) -> String {
+        self.backends.iter().find(|b| b["id"] == id).and_then(|b| b["name"].as_str()).unwrap_or(id).to_owned()
+    }
+
+    /// `recheck`: opened from a chat's sign-in request, whose agent refused a turn, so the agent
+    /// is asked again however signed in it looked.
+    pub fn open_agent(&mut self, backend: &str, recheck: bool) {
+        let b = self.backends.iter().find(|b| b["id"] == backend);
+        // An agent without its Node.js can't start, so there's nothing to ask it yet.
+        let known = b.is_some_and(|b| (b["signedIn"] == true && !recheck) || b["node"] == "missing");
         let mut a = AgentSetup { backend: backend.to_owned(), auth: None, busy: false, cursor: 0, error: None };
         if !known {
             a.busy = true;
@@ -22,6 +31,9 @@ impl App {
         let mut rows = vec![];
         if b.is_some_and(|b| b["curated"] == true && b["installed"] != true && b["canInstall"] == true) {
             rows.push(SetupRow::Install);
+        }
+        if b.is_some_and(|b| b["node"] == "missing") {
+            rows.push(SetupRow::Node);
         }
         let signed_in =
             a.auth.as_ref().map_or_else(|| b.map(|b| &b["signedIn"]) == Some(&json!(true)), |v| v["signedIn"] == true);
@@ -49,6 +61,7 @@ impl App {
                 let size = json!({"cols": cols, "rows": rows_n});
                 match rows.get(a.cursor) {
                     Some(SetupRow::Install) => self.start_setup(&backend, "install", None, &size),
+                    Some(SetupRow::Node) => self.start_setup(&backend, "node", None, &size),
                     Some(SetupRow::Login) => self.start_setup(&backend, "login", None, &size),
                     Some(SetupRow::Method(m)) => match m["kind"].as_str() {
                         Some("terminal") => self.start_setup(&backend, "login", m["id"].as_str(), &size),
@@ -89,7 +102,7 @@ impl App {
         Some(Overlay::Agent(a))
     }
 
-    fn start_setup(&mut self, backend: &str, step: &str, method: Option<&str>, size: &Value) {
+    pub(super) fn start_setup(&mut self, backend: &str, step: &str, method: Option<&str>, size: &Value) {
         let mut body = json!({"backend": backend, "step": step, "cols": size["cols"], "rows": size["rows"]});
         if let Some(m) = method {
             body["method"] = m.into();

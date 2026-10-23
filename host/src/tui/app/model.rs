@@ -1,6 +1,10 @@
 //! What the host sends: bots, transcript entries, and the messages that carry them.
 
+use serde::Deserialize;
 use serde_json::Value;
+use std::collections::BTreeMap;
+
+use crate::agent::fallback::Reason;
 
 use super::super::manage::Reply;
 use super::tilde;
@@ -33,11 +37,10 @@ pub enum After {
     Sent(String),
     Connection(String, super::super::connections::Step),
     Hello,
-    /// `track`: fire and forget (an older host doesn't know it).
+    /// `track`: fire and forget; analytics never surfaces an error.
     Tracked,
     Analytics,
     History(String),
-    Thread,
     Dirs,
     Pairing,
     Backends,
@@ -93,10 +96,34 @@ pub struct Bot {
     pub managed_workspace: bool,
     pub auto: bool,
     pub model: Option<String>,
+    /// The model's own settings (effort, fast…): option id → value.
+    pub model_options: BTreeMap<String, String>,
+    pub fast_mode: bool,
+    /// What the agent says about Fast mode: `unknown`, `offered`, `unsupported` or `refused`.
+    pub fast_support: String,
+    /// Why the agent refused it.
+    pub fast_issue: Option<String>,
     pub pinned: bool,
+    /// Where the user dragged it (see `App::roster`).
+    pub position: i64,
     pub hidden: bool,
     pub notify: bool,
     pub computer: bool,
+    /// It creates bots and changes any bot's setup (`chat::manage`); `None` from a host without it.
+    pub manage_team: Option<bool>,
+    /// The bot that created this one; `None` when the user did.
+    pub created_by: Option<String>,
+    pub created_at: i64,
+    /// The harness's own memory kept on beside Codync's; `None` where it has no switch.
+    pub harness_memory: Option<bool>,
+    /// Agents that carry on, in order, when its own can't answer (`agent::fallback`).
+    pub fallbacks: Vec<crate::store::Fallback>,
+    /// The bot may set its own fallbacks.
+    pub self_fallbacks: bool,
+    /// The fallback agent it's on now; `None` on its own.
+    pub agent_step: Option<String>,
+    /// Agents of its chain resting now.
+    pub resting: Vec<Rest>,
     pub connectors: Vec<String>,
     pub skills: Vec<String>,
     pub status: Status,
@@ -108,16 +135,78 @@ pub struct Bot {
     /// A group chat: several bots and the user, no agent of its own.
     pub group: bool,
     pub members: Vec<String>,
-    /// Where the running turn talks: a chat (`None` = its own) and a thread in it.
+    /// Where the running turn talks: a chat (`None` = its own).
     pub working_chat: Option<String>,
-    pub working_thread: Option<String>,
+}
+
+/// An agent of a bot's chain that rests (`agent::fallback::resting`) until `until` (epoch ms).
+#[derive(Deserialize, Clone, Debug)]
+pub struct Rest {
+    pub agent: String,
+    pub until: i64,
+    pub reason: Reason,
 }
 
 fn strs(v: &Value) -> Vec<String> {
     v.as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect()
 }
 
+/// A model an agent offers (`agentModels`), with its own settings.
+pub struct AgentModel {
+    pub id: String,
+    pub name: String,
+    pub options: Vec<ModelOption>,
+}
+
+/// A model setting (effort, fast…) and its values as `(id, name)`.
+pub struct ModelOption {
+    pub id: String,
+    pub name: String,
+    pub values: Vec<(String, String)>,
+}
+
+impl AgentModel {
+    pub fn parse(v: &Value) -> Option<Self> {
+        let pair = |v: &Value| {
+            let id = v["id"].as_str()?.to_owned();
+            Some((v["name"].as_str().unwrap_or(&id).to_owned(), id))
+        };
+        let (name, id) = pair(v)?;
+        let options = v["options"].as_array().into_iter().flatten().filter_map(|o| {
+            let (name, id) = pair(o)?;
+            let values = o["values"].as_array()?.iter().filter_map(|v| pair(v).map(|(n, i)| (i, n))).collect();
+            Some(ModelOption { id, name, values })
+        });
+        Some(Self { id, name, options: options.collect() })
+    }
+}
+
 impl Bot {
+    /// An agent bot unless its agent said it has no Fast mode (an unknown one may: its first
+    /// session settles it), or one that has it on (so it can be turned off).
+    pub fn fast_shown(&self) -> bool {
+        !self.group && (self.fast_mode || self.fast_support != "unsupported")
+    }
+
+    /// Why Fast mode isn't in effect, when the agent turned it off itself.
+    pub fn fast_refusal(&self) -> Option<String> {
+        (self.fast_mode && self.fast_support == "refused").then(|| {
+            format!(
+                "The agent turned it off: {}. Switch it off and on to try again.",
+                self.fast_issue.as_deref().unwrap_or("not available")
+            )
+        })
+    }
+
+    /// What picking `/fast` does, or why Fast mode isn't in effect.
+    pub fn fast_detail(&self) -> String {
+        match self.fast_refusal() {
+            Some(why) => why,
+            None if self.fast_mode => "Turn off and return to standard speed".to_owned(),
+            None => "Turn on for faster replies and more usage".to_owned(),
+        }
+    }
+
     /// Where it works, as the header shows it.
     pub fn folder(&self, home: &str) -> String {
         if self.managed_workspace { "personal workspace".to_owned() } else { tilde(&self.cwd, home) }
@@ -136,10 +225,28 @@ impl Bot {
             managed_workspace: v["managedWorkspace"] == true,
             auto: v["permission"] == "auto",
             model: v["model"].as_str().filter(|m| !m.is_empty()).map(str::to_owned),
+            model_options: v["modelOptions"]
+                .as_object()
+                .into_iter()
+                .flatten()
+                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                .collect(),
+            fast_mode: v["fastMode"].as_bool().unwrap_or(false),
+            fast_support: v["fastModeSupport"].as_str().unwrap_or("unknown").to_owned(),
+            fast_issue: v["fastModeIssue"].as_str().map(str::to_owned),
             pinned: v["pinned"].as_bool().unwrap_or(false),
+            position: v["position"].as_i64().unwrap_or(0),
             hidden: v["hidden"].as_bool().unwrap_or(false),
             notify: v["notify"].as_bool().unwrap_or(true),
             computer: v["computer"].as_bool().unwrap_or(false),
+            manage_team: v["manageTeam"].as_bool(),
+            created_by: v["createdBy"].as_str().map(str::to_owned),
+            created_at: v["createdAt"].as_i64().unwrap_or(0),
+            harness_memory: v["harnessMemory"].as_bool(),
+            fallbacks: serde_json::from_value(v["fallbacks"].clone()).unwrap_or_default(),
+            self_fallbacks: v["selfFallbacks"].as_bool().unwrap_or(true),
+            agent_step: v["agentStep"]["agent"].as_str().map(str::to_owned),
+            resting: serde_json::from_value(v["resting"].clone()).unwrap_or_default(),
             connectors: strs(&v["connectors"]),
             skills: strs(&v["skills"]),
             status: match v["status"].as_str() {
@@ -156,13 +263,17 @@ impl Bot {
             group: v["kind"] == "group",
             members: strs(&v["members"]),
             working_chat: v["workingChat"].as_str().map(str::to_owned),
-            working_thread: v["workingThread"].as_str().map(str::to_owned),
         })
     }
 
-    /// Whether the running turn talks in this chat: its main lane (`None`) or that thread.
-    pub fn works_in(&self, thread: Option<&str>) -> bool {
-        self.away().is_none() && self.working_thread.as_deref() == thread
+    /// Agent `agent`'s rest, while it lasts at `now`.
+    pub fn rests(&self, agent: &str, now: i64) -> Option<&Rest> {
+        self.resting.iter().find(|r| r.agent == agent && r.until > now)
+    }
+
+    /// Whether the running turn talks in this chat.
+    pub fn works_here(&self) -> bool {
+        self.away().is_none()
     }
 
     /// The other chat (a group) the running turn talks in, if it isn't this bot's own.
@@ -201,8 +312,6 @@ pub struct Entry {
     pub kind: Kind,
     pub data: Value,
     pub created_at: i64,
-    /// The main-chat message whose thread this is in; `None` is the main chat.
-    pub thread_id: Option<String>,
 }
 
 impl Entry {
@@ -226,7 +335,6 @@ impl Entry {
                 kind,
                 data: v["data"].clone(),
                 created_at: v["createdAt"].as_i64().unwrap_or(0),
-                thread_id: v["threadId"].as_str().map(str::to_owned),
             },
         ))
     }
@@ -257,9 +365,34 @@ impl Entry {
         self.kind == Kind::Agent && self.data["final"].as_bool().unwrap_or(false)
     }
 
+    /// A message the user can answer with a reply: theirs, or a final reply (the host checks too).
+    pub fn takes_reply(&self) -> bool {
+        self.kind == Kind::User || self.is_final()
+    }
+
+    /// The text a reply quotes: the message's, or its files' names.
+    pub fn quoted(&self) -> String {
+        crate::store::message_text(&self.data)
+    }
+
     /// What the chat shows as a message: the user's, and each turn's final reply.
     pub fn is_message(&self) -> bool {
         self.kind == Kind::User || self.is_final() || self.data["connectionRequest"].is_object()
+    }
+
+    /// A line that folds away a longer text: a handoff (`o` shows it).
+    pub fn unfolds(&self) -> bool {
+        crate::tui::view::unfoldable(self).is_some()
+    }
+
+    /// A failure notice that offers adding a fallback agent (`A`).
+    pub fn adds_fallback(&self) -> bool {
+        self.kind == Kind::Notice && self.data["addFallback"] == true
+    }
+
+    /// A failed routine run's notice that offers running it again (`F`).
+    pub fn retries(&self) -> bool {
+        self.kind == Kind::Notice && self.data["retry"] == true && self.data["runId"].is_string()
     }
 
     /// A notice for a bot-to-bot message or request (`chat::team`).
@@ -313,7 +446,6 @@ mod tests {
                 {"optionId": "a", "name": "Allow", "kind": "allow_once"},
             ]}),
             created_at: 0,
-            thread_id: None,
         };
         assert!(e.pending());
         let kinds: Vec<String> = e.options().into_iter().map(|o| o.2).collect();

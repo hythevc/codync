@@ -53,32 +53,48 @@
 .sidebar-account:hover,
 .sidebar-account.active { background: var(--bubble-agent); }
 
-.connect-apps {
+.extensions {
   flex: 1;
   min-width: 0;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
   white-space: nowrap;
-  font-size: calc(13px * var(--scale));
+  font-size: var(--text-body);
   font-weight: 500;
-  background: var(--chrome-fill);
   border: 1px solid var(--chrome-stroke);
   transition: background-color var(--hover), transform var(--hover);
 }
-.connect-apps:hover { background: color-mix(in srgb, var(--text) 10%, var(--surface)); }
-.connect-apps:active,
+.extensions:hover { background: rgba(var(--text-rgb), 0.05); }
+.extensions:active,
 .sidebar-account:active { transform: scale(.97); }
-.connect-apps-logos { display: flex; flex: none; }
-.connect-apps-logos img { width: 14px; height: 16px; padding: 1px; background: #fff; border-radius: 3px; object-fit: contain; }
-.connect-apps-logos > * + * { margin-left: -3px; }
+.extensions-logos { display: flex; flex: none; }
+.extensions-logos img { width: 14px; height: 16px; padding: 1px; background: #fff; border-radius: 3px; object-fit: contain; }
+.extensions-logos > * + * { margin-left: -3px; }
+
+/* An available release: one filled circle that stands out from the quiet chrome around it. */
+.update-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--on-accent);
+  background: var(--accent-fill);
+  animation: update-badge-in var(--layout) both;
+  transition: opacity var(--hover), transform var(--hover);
+}
+.update-badge:hover:not(:disabled) { opacity: .85; }
+.update-badge:active:not(:disabled) { transform: scale(.94); }
+.update-badge .spinner circle { stroke: currentColor; }
+@keyframes update-badge-in { from { opacity: 0; transform: scale(.6); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .connect-apps:active, .sidebar-account:active { transform: none; }
+  .extensions:active, .sidebar-account:active, .update-badge:active:not(:disabled) { transform: none; }
+  .update-badge { animation: none; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .sidebar-footer-fade { background: var(--surface); inset: 0; }

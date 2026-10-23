@@ -1,9 +1,12 @@
 //! The screen's state: panes, overlays and their forms, and where clicks land.
 
 use ratatui::layout::Rect;
+use std::collections::BTreeMap;
 use std::time::Instant;
 
-use super::super::manage::{AgentSetup, BotChatSheet, Fields, Market, MemorySheet, RoutineForm, RoutineList};
+use super::super::manage::{
+    AgentSetup, AnalyticsSheet, BotChatSheet, Fields, Market, MemorySheet, RoutineForm, RoutineList, SkillSheet,
+};
 use super::{Editor, Mark};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -47,28 +50,32 @@ pub enum Action {
     NewGroup,
     Market,
     Memory,
-    Routines,
+    Details,
     RefreshAgents,
     Pair,
     Usage,
     CheckUpdate,
     Analytics,
+    AboutAnalytics,
     Keys,
+    Appearance(super::super::appearance::Appearance),
 }
 
-pub const NEW_GROUP: &str = "New group chat";
-
-pub const ACTIONS: [(&str, &str, Action); 11] = [
+pub const ACTIONS: [(&str, &str, Action); 15] = [
     ("New bot…", "n", Action::NewBot),
     ("New group chat…", "m", Action::NewGroup),
-    ("Marketplace: agents, connectors, skills…", "A", Action::Market),
+    ("Extensions: agents, connectors, skills…", "A", Action::Market),
     ("Memory of this bot…", "M", Action::Memory),
-    ("Routines of this bot…", "R", Action::Routines),
+    ("Details of this bot…", "R", Action::Details),
     ("Refresh agents", "", Action::RefreshAgents),
     ("Pair a phone…", "P", Action::Pair),
     ("Usage", "U", Action::Usage),
     ("Check for updates", "", Action::CheckUpdate),
     ("Share usage analytics", "", Action::Analytics),
+    ("About usage analytics…", "", Action::AboutAnalytics),
+    ("Appearance: System", "", Action::Appearance(super::super::appearance::Appearance::System)),
+    ("Appearance: Light", "", Action::Appearance(super::super::appearance::Appearance::Light)),
+    ("Appearance: Dark", "", Action::Appearance(super::super::appearance::Appearance::Dark)),
     ("Keys", "?", Action::Keys),
 ];
 
@@ -86,7 +93,8 @@ pub struct Goto {
 pub enum ConfirmAct {
     Delete(String),
     NewSession(String),
-    ClearMemory(String),
+    /// Keeps a bot's harness's own memory on beside Codync's.
+    KeepHarnessMemory(String),
     DeleteRoutine(String, String),
     RotateRoutineKey(String, String),
     RemoveConnector(String),
@@ -101,9 +109,22 @@ pub struct Confirm {
     pub act: ConfirmAct,
 }
 
-pub struct AgentPicker {
-    pub query: Editor,
-    pub cursor: usize,
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NewBotField {
+    Name,
+    Color,
+    Shape,
+}
+
+/// A new bot: a name (optional: the host names it after its first conversations) and its looks.
+/// Everything else takes the defaults and is changed afterwards in Settings.
+pub struct NewBot {
+    pub name: Editor,
+    pub color: usize,
+    pub shape: usize,
+    pub field: NewBotField,
+    pub error: Option<String>,
+    pub saving: bool,
 }
 
 #[derive(Clone)]
@@ -122,9 +143,7 @@ pub struct FolderPicker {
     pub error: Option<String>,
 }
 
-pub const COLORS: [&str; 11] =
-    ["black", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet", "magenta", "gray"];
-pub const SHAPES: [&str; 8] = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"];
+pub use crate::store::{AVATAR_COLORS as COLORS, AVATAR_SHAPES as SHAPES};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Field {
@@ -132,25 +151,35 @@ pub enum Field {
     Instructions,
     Agent,
     Model,
+    ModelOptions,
+    Fast,
+    Fallbacks,
+    SelfFallbacks,
     Folder,
     Approvals,
     Notify,
     Computer,
+    Team,
     Color,
     Shape,
     Connectors,
     Skills,
 }
 
-pub const FIELDS: [Field; 12] = [
+pub const FIELDS: [Field; 17] = [
     Field::Name,
     Field::Instructions,
     Field::Agent,
     Field::Model,
+    Field::ModelOptions,
+    Field::Fast,
+    Field::Fallbacks,
+    Field::SelfFallbacks,
     Field::Folder,
     Field::Approvals,
     Field::Notify,
     Field::Computer,
+    Field::Team,
     Field::Color,
     Field::Shape,
     Field::Connectors,
@@ -165,29 +194,44 @@ pub struct Toggle {
 
 #[allow(clippy::struct_excessive_bools, reason = "independent bot settings and save state")]
 pub struct Form {
-    pub bot_id: Option<String>,
+    pub bot_id: String,
     pub name: Editor,
     pub instructions: Editor,
     pub backend: String,
     pub model: Editor,
+    /// Model settings (effort, fast…) and the model they were picked for.
+    pub model_options: (String, BTreeMap<String, String>),
+    pub fast: bool,
+    /// Agents that carry on, in order, when the bot's own can't answer.
+    pub fallbacks: Vec<crate::store::Fallback>,
+    pub self_fallbacks: bool,
     pub cwd: String,
     pub auto: bool,
     pub notify: bool,
     pub computer: bool,
+    /// `None`: the host has no Manage the team.
+    pub manage_team: Option<bool>,
     pub color: usize,
     pub shape: usize,
     pub connectors: Vec<Toggle>,
     pub skills: Vec<Toggle>,
     pub field: usize,
-    /// Cursor inside the connector / skill toggles.
+    /// Cursor inside the connector / skill toggles, the model options or the fallbacks.
     pub sub: usize,
     pub error: Option<String>,
     pub saving: bool,
+    /// The settings as opened, to tell edits apart.
+    pub opened: serde_json::Value,
 }
 
 impl Form {
     pub fn current(&self) -> Field {
         FIELDS[self.field]
+    }
+
+    /// The settings picked for the model now in the field; another model has none yet.
+    pub fn model_options(&self) -> Option<&BTreeMap<String, String>> {
+        (self.model_options.0 == self.model.text.trim()).then_some(&self.model_options.1)
     }
 }
 
@@ -199,16 +243,21 @@ pub enum GroupField {
 }
 
 impl GroupField {
-    pub(super) fn next(self) -> Self {
+    /// The field after this one; a new group has no About (it is written afterwards, in the editor).
+    pub(super) fn next(self, about: bool) -> Self {
         match self {
-            Self::Name => Self::About,
-            Self::About => Self::Bots,
+            Self::Name if about => Self::About,
+            Self::Name | Self::About => Self::Bots,
             Self::Bots => Self::Name,
         }
     }
 
-    pub(super) fn prev(self) -> Self {
-        self.next().next()
+    pub(super) fn prev(self, about: bool) -> Self {
+        match self {
+            Self::Name => Self::Bots,
+            Self::Bots if about => Self::About,
+            Self::About | Self::Bots => Self::Name,
+        }
     }
 }
 
@@ -217,7 +266,8 @@ pub struct GroupForm {
     /// The group being edited; `None` creates one.
     pub group_id: Option<String>,
     pub name: Editor,
-    /// What the group is for; sent as `description`, shown to its members.
+    /// What the group is for; sent as `description`, shown to its members. Edited only:
+    /// a new group starts without one.
     pub about: Editor,
     /// Picked bot ids, in the order they were picked.
     pub members: Vec<String>,
@@ -227,16 +277,23 @@ pub struct GroupForm {
     pub saving: bool,
 }
 
+/// The pair-a-phone sheet's code: on its way, shown (its pairing link), or why none came.
+pub enum PairCode {
+    Loading,
+    Ready(String),
+    Failed(String),
+}
+
 pub enum Overlay {
     Goto(Goto),
     Help(Editor),
     Confirm(Confirm),
-    Agents(AgentPicker),
+    NewBot(NewBot),
     Folder(FolderPicker),
     Form(Box<Form>),
     Group(GroupForm),
     Usage,
-    Pair(Option<String>),
+    Pair(PairCode),
     Memory(MemorySheet),
     /// A read-only conversation between two bots.
     BotChat(BotChatSheet),
@@ -245,8 +302,8 @@ pub enum Overlay {
     Market(Box<Market>),
     Agent(AgentSetup),
     Fields(Box<Fields>),
-    /// The one-time analytics question; `true` highlights Share usage.
-    Consent(bool),
+    Skill(SkillSheet),
+    Analytics(AnalyticsSheet),
 }
 
 pub struct Toast {
@@ -264,8 +321,6 @@ pub enum Click {
     },
     Filter(usize),
     Composer,
-    /// The replies line under a message: opens its thread.
-    Thread(String),
     /// A bot-message row (entry id): opens the conversation.
     BotChat(String),
 }

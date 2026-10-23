@@ -24,6 +24,32 @@ pkill -x "Codync Dev"
 
 `pkill` can return nonzero when no process exists.
 
+### Replace an installed macOS build completely
+
+For a requested **build and install**, replace the whole app and its running
+host, then verify the installed result. Building or copying the app alone does
+not finish the task.
+
+1. Quit the selected variant and stop its old host before rebuilding. Preserve
+   its data directory and leave production, other variants and sandboxes alone.
+2. Run `npm run dist:mac:dev` for Codync Dev (`dist:mac:main` for production).
+3. Remove the previous installed app bundle, then copy the complete new bundle
+   into `/Applications`; do not merge files into the previous bundle.
+4. Explicitly run the **new installed bundled host's** installer, even if its
+   launch-agent plist already exists. For Dev:
+   `"/Applications/Codync Dev.app/Contents/Resources/codync-host" install --port 19223`.
+   A plist left after `launchctl bootout` does not mean the service is loaded;
+   opening the app alone can leave it showing **The host isn't running**.
+5. Open the installed app. Verify `/health` on the variant's port reports the
+   expected environment, version, installed binary path and hash, and verify
+   the app reaches its connected main screen. Retry its connection if it opened
+   before the host was ready. Do not report installation complete before both
+   checks pass.
+
+This sequence records the Dev installation failure on 2026-10-23: the old host
+was booted out, the app bundle was replaced, but the service was not reloaded
+until the new bundled host's `install` command was run explicitly.
+
 The desktop app (`apps/desktop/src/main/host-controller.ts`) compares the running
 host's executable path and SHA-256 fingerprint with the host it would install (the
 bundled one in a packaged Mac app, else `CODYNC_HOST_BIN` or an installed
@@ -35,10 +61,12 @@ successful restart; stop that host in its terminal and retry. Hosts attached usi
 `CODYNC_PORT` are managed manually.
 
 On SIGTERM the host stops its bots without waiting for open SSE or WebSocket
-connections. ACP adapters run in separate process groups; stopping an adapter
-also kills tools and MCP servers that remain in its group. Processes that detach
-into their own sessions and unrelated hosts using other data directories are
-outside this cleanup.
+connections. ACP adapters run in separate process groups. Stopping an adapter
+closes its stdin and gives its group 10 seconds to exit by itself, so a Claude
+Code CLI can finish saving a refreshed login. Tools and MCP servers still left
+in the group after that are killed, and the host waits for this before it exits.
+Processes that detach into their own sessions and unrelated hosts using other
+data directories are outside this cleanup.
 
 After rebuilding the host, restart the service (macOS launch agent shown; Linux
 uses the environment-specific systemd user unit). Stop only test hosts you started; do not kill another environment's host. For Dev:
@@ -80,18 +108,26 @@ Unlock the phone when required. Build, install, launch, and visual inspection ar
 | Cloud integration | `cd cloud && env -u CODYNC_CLOUD npm run e2e` | Built host; see [Cloudflare testing](cloudflare-testing.md) |
 | APNs relay | `cd relay && npm ci && npm test && npm run typecheck` | Separate package from `cloud/` |
 
-### Screen helpers
+### Pre-commit checks
 
-Enable the repository's staged-file checks once per checkout:
+Enable the repository's pre-commit hook once per checkout:
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
-When a screen helper changes, the pre-commit hook checks Linux Rust formatting
-and parses the macOS Swift sources (on macOS). The platform builds remain in
-GitHub Actions: Linux requires GStreamer development packages, and macOS builds
-the `Screen` Xcode target against WebRTC.
+It runs CI's checks for each part a commit touches, so a failure shows up before the push:
+host and the memory crate (`cargo fmt --all --check`, clippy and `cargo test` for the workspace), desktop, cloud
+and relay (`npm run typecheck`, `npm test`), the Android app (core and app unit tests, and a Kotlin compile of
+the app and its instrumentation tests, with JDK 21), Linux screen helper formatting, and a parse of the macOS
+screen helper's Swift sources (on macOS). It checks the staged files only, in a copy under `.git/precommit-snapshot`,
+so other agents' uncommitted edits in the same checkout neither break nor rescue a commit; the
+host builds into `host/target/precommit`, and its tests are stopped after 5 minutes so a hung
+test fails the commit instead of holding it. The npm checks reuse each package's `node_modules`
+(run `npm ci` there first).
+
+Left to CI: the iOS Kit tests (an iPhone simulator) and the platform builds (Linux screen
+helper: GStreamer development packages; macOS: the `Screen` Xcode target against WebRTC).
 
 Host development: `cargo run --manifest-path host/Cargo.toml -- serve`. Avoid competing with an installed host on port 19222; isolated tests should use a temporary `CODYNC_HOME` and another port. Stop test hosts when finished.
 
@@ -101,6 +137,21 @@ Follow [UI conventions](../design/ui-conventions.md) for native toolbar behavior
 
 Versions are defined in `apps/project.yml` (`MARKETING_VERSION`), `host/Cargo.toml` and `apps/desktop/package.json`; keep them equal (the desktop release workflow fails when the app and host differ), then regenerate the Xcode project.
 
+## GitHub releases
+
+Greptile reviews every PR into `dev` or `main` when it opens and on each push (`.greptile/config.json`), and posts a *Greptile Review* check beside CI. Before the release PR merges into `main`, check each finding against the code and have the agent that owns that area fix it. `@greptileai review` on the PR asks for a fresh review.
+
+Auto Tag (`.github/workflows/auto-tag.yml`) creates each `v*` release right after pushing the tag, before the host and desktop jobs upload to it. Releases go up without GitHub's *latest* mark: the release gate gives it to the newest fully uploaded release the App Store's iPhone app works with, so downloads, updaters and Homebrew wait for App Review when a release needs a newer iPhone app ([holding releases](../reference/compatibility.md#holding-releases-for-the-app-store)). Its description comes from `tools/release-notes.sh`: the `## Summary` of the PR that merged the version bump into `main` (or the PR's opening text without that heading), else the `feat`/`fix` commits since the previous tag, followed by GitHub's generated PR list and compare link. Write the release PR's Summary for people reading the release page. The same description is posted to the Discord server's #releases channel through the webhook in the `DISCORD_RELEASES_WEBHOOK` secret (a failed post only leaves a warning on the run); each `@login` there whose GitHub account is linked on the Discord Worker becomes a mention that pings them (`DISCORD_MENTIONS_SECRET`, [discord/README.md](../../discord/README.md)).
+
+## codync-mem releases
+
+The memory crate (`host/crates/memory`) has its own 0.x version and ships with the Codync release that carries its changes, through `.github/workflows/memory-crate.yml`:
+
+- A pull request into `main` that changes the crate (its `.github`, the mirror's CI, aside) fails unless the crate's `version` differs from `main`'s.
+- The push to `main` mirrors the crate to [leepokai/codync-mem](https://github.com/leepokai/codync-mem) (write deploy key in the `CODYNC_MEM_DEPLOY_KEY` secret), then publishes its version to crates.io unless crates.io already has it. Publishing uses trusted publishing: the crate's Settings → Trusted Publishing on crates.io trusts `leepokai/Codync` with the workflow `memory-crate.yml`, so no token is stored.
+
+To bump, set `version` in `host/crates/memory/Cargo.toml` (patch for fixes, minor for API changes while 0.x) and run `cargo check -p codync-mem` in `host/` to update its `Cargo.lock` entry. A published version can't be deleted, only yanked.
+
 ## iOS releases (Xcode Cloud)
 
-The Xcode Cloud workflow "Release" on the product "iOS" has no automatic start condition (its own tag trigger never fired); it only runs when started through the API, and it archives the `iOS` scheme in Release with deployment preparation **TestFlight and App Store** (the "Internal Testing Only" option produces builds App Review can't take) and uploads it to App Store Connect. Xcode Cloud overrides the build number with its own counter (`CI_BUILD_NUMBER`, configured under Xcode Cloud settings → Build Number in App Store Connect), so `CURRENT_PROJECT_VERSION` in `project.yml` is only the local default. The checked-in `apps/Codync.xcodeproj` is what the cloud builds: regenerate it whenever `project.yml` changes, and commit `apps/Codync.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` whenever a package version changes (Xcode Cloud never resolves packages itself; copy `apps/ios/Kit/Package.resolved` there if Xcode wrote it to `apps/ios/Kit/`). Xcode Cloud reads public package repositories without any connection. The `Submit iOS` GitHub workflow (`.github/workflows/ios-submit.yml` → `tools/asc-submit.py`, secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`) runs on every `v*` tag (the tags Auto Tag pushes after a version bump on `main`). It compares the tag with the last version sent to the App Store: when nothing the iPhone app is built from changed (`apps/ios/` including `apps/ios/Kit/`, `apps/shared/`, the package pins, or `apps/project.yml` beyond its version lines), iOS skips that release, so host- or desktop-only releases neither build nor touch a version in review. Otherwise it starts the Xcode Cloud archive on the tag, waits for that build to finish processing and submits it for App Review, released automatically after approval. The latest version wins: a version still *Waiting for Review* is pulled back, renamed and resubmitted with the new build; one already *In Review* or approved is left alone (rerun the workflow with the version once it is out). *What's New* comes from the version's `## <version>` section in `apps/ios/WhatsNew.md` (one `### <locale>` per App Store language, written in the version bump); without one, the `### zh-Hant` / `### en-US` bullets under `## What's New` in the PR template are collected from every PR merged since the last App Store version (changes pushed to `main` without a PR add nothing); with neither, empty fields get a generic "Bug fixes and improvements" line. Running `Submit iOS` by hand with a version ships it even without iPhone changes. `python3 tools/asc-submit-test.py` checks the PR parsing and the change detection. `DRY_RUN=1 tools/asc-submit.py <version>` prints the writes without making them.
+The Xcode Cloud workflow "Release" on the product "iOS" has no automatic start condition (its own tag trigger never fired); it only runs when started through the API, and it archives the `iOS` scheme in Release with deployment preparation **TestFlight and App Store** (the "Internal Testing Only" option produces builds App Review can't take) and uploads it to App Store Connect. Xcode Cloud overrides the build number with its own counter (`CI_BUILD_NUMBER`, configured under Xcode Cloud settings → Build Number in App Store Connect), so `CURRENT_PROJECT_VERSION` in `project.yml` is only the local default. The checked-in `apps/Codync.xcodeproj` is what the cloud builds: regenerate it whenever `project.yml` changes, and commit `apps/Codync.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` whenever a package version changes (Xcode Cloud never resolves packages itself; copy `apps/ios/Kit/Package.resolved` there if Xcode wrote it to `apps/ios/Kit/`). Xcode Cloud reads public package repositories without any connection. The `Submit iOS` GitHub workflow (`.github/workflows/ios-submit.yml` → `tools/asc-submit.py`, secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`) runs on every `v*` tag (the tags Auto Tag pushes after a version bump on `main`). It compares the tag with the last version sent to App Review (a version never sent or pulled back, such as one a failed run left behind, doesn't count; a rejected one does): when nothing the iPhone app is built from changed (`apps/ios/` including `apps/ios/Kit/`, except `WhatsNew.md` and the Kit tests, `apps/shared/`, the package pins, or `apps/project.yml` beyond its version lines), iOS skips that release, so host- or desktop-only releases neither build nor touch a version in review. Otherwise it starts the Xcode Cloud archive on the tag (or on `main` while `main` is the tagged commit: Xcode Cloud hears of a new tag through a GitHub webhook that sometimes never arrives), waits for that build to finish processing and submits it for App Review, released automatically after approval. The latest version wins: a version still *Waiting for Review* is pulled back, renamed and resubmitted with the new build; one already *In Review* or approved is left alone (rerun the workflow with the version once it is out). *What's New* comes from the version's `## <version>` section in `apps/ios/WhatsNew.md` (one `### <locale>` per App Store language, written in the version bump); without one, the `### zh-Hant` / `### en-US` bullets under `## What's New` in the PR template are collected from every PR merged since the last App Store version (changes pushed to `main` without a PR add nothing); with neither, empty fields get a generic "Bug fixes and improvements" line. Running `Submit iOS` by hand with a version ships it even without iPhone changes. After each `Submit iOS` run, the `iOS dSYMs` workflow (`.github/workflows/ios-dsyms.yml` → `tools/upload-dsyms.py`, on macOS) downloads that release's archive from Xcode Cloud and uploads its dSYMs to PostHog (secret `POSTHOG_CLI_API_KEY`), so iPhone crash reports are symbolicated; run it by hand with a version after a manual `Submit iOS` or to upload an older one ([iPhone crash tracing](iphone-crash-tracing.md)). `python3 tools/asc-submit-test.py` checks the PR parsing, the change detection and the archive source. `DRY_RUN=1 tools/asc-submit.py <version>` prints the writes without making them.

@@ -4,9 +4,29 @@ The iOS app uses the official ClerkKit SDK (1.5.6). The desktop app talks to Cle
 Frontend API directly, the way ClerkKit does on native apps (`apps/desktop/src/main/account.ts`):
 a device token kept encrypted with Electron `safeStorage`, OAuth in the system browser.
 
+## Recovering phone access
+
+On iOS and Android, an unreachable paired account computer shows **Ask for access**
+next to its connection error. A pending request reopens its code. If this phone
+already has account approval, **Request new approval** explicitly replaces only
+this phone's grants, then starts the normal matching-code approval flow. Opening
+the sheet alone does not revoke anything. The computer must be online to answer;
+requesting access cannot repair an offline host. Existing pairing data and local
+addresses and color/route preferences survive renewal, and a saved pairing never counts as
+approval of a new request.
+
+Phone device lists do not offer **Remove** for computers in the signed-in account,
+including older identities. Independently paired computers can still be removed
+locally, and **Revoke this phone's access** remains available for account grants.
+Android keeps the current pairing while another computer is being approved, then
+switches its local connection only after approval; both account records remain.
+Desktop account management remains the place to remove an account computer.
+This is a phone recovery flow: the desktop manages the host/account and the TUI
+connects to its local host; neither has this phone access-request screen.
+
 ## Configuration
 
-The iOS app uses `apps/ios/App/AccountSession.swift`. Public keys and cloud URLs come from `apps/shared/Config/<env>.plist`, copied into the bundle as `AccountConfig.plist` by `project.yml`; Debug selects dev and Release selects main. The desktop app reads the same plist through `node apps/desktop/tools/account-config.mjs <env>` (run by `npm run dev` and `npm run dist:*:<env>`), which writes `resources/account-config.json` (`CODYNC_CLERK_PUBLISHABLE_KEY` / `CODYNC_CLOUD_URL` override it). See [environments](environments-and-deployment.md).
+The iOS app uses `apps/ios/App/AccountSession.swift`. Public keys and cloud URLs come from `apps/shared/Config/<env>.plist`, copied into the bundle as `AccountConfig.plist` by `project.yml`; `iOS Dev` (`DevDebug` / `DevRelease`) selects dev and `iOS` (`Debug` / `Release`) selects main. The desktop app reads the same plist through `node apps/desktop/tools/account-config.mjs <env>` (run by `npm run dev` and `npm run dist:*:<env>`), which writes `resources/account-config.json` (`CODYNC_CLERK_PUBLISHABLE_KEY` / `CODYNC_CLOUD_URL` override it). See [environments](environments-and-deployment.md).
 
 Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. The desktop app uses `com.pokai.Codync`, iOS uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
 
@@ -37,15 +57,13 @@ the computer's web sign-in and the iPhone's native sign-in got different Apple u
 and became two Clerk users; don't switch development back to shared credentials.
 
 To check cross-device discovery, sign in with the same Apple Account on both
-devices of one environment (Debug ↔ Debug, Release ↔ Release) and verify that
+devices of one environment (Dev ↔ Dev, production ↔ production) and verify that
 Clerk has one user ID. Then verify that the computer joins the account and the phone
 requests access with the existing approval flow. Hide My Email does not change the
 device approval requirement.
 
-Verified on 2026-09-30 with the SwiftUI Mac app that preceded the desktop app:
-Apple OAuth completed and showed the signed-in private relay address. The desktop
-app's Apple sign-in and production cross-device identity matching still need to be
-checked on a release build.
+The desktop app's Apple sign-in and production cross-device identity matching
+still need to be checked on a release build.
 
 ### iOS Sign in with Apple
 
@@ -97,9 +115,10 @@ The desktop app's menu bar **Settings → Reset all data…** (confirmed in the 
 the computer's start over: it removes this computer from the account, revokes every
 paired device, signs out, uninstalls the host, deletes its data folder and the app's
 settings, and relaunches into the welcome screen. The host comes back with a new
-identity, so phones see the old computer as **No access** (if they were connected)
-or as an older copy once the new one is reachable, and offer to remove it; pair
-again or ask for access to reach the new one.
+identity, so phones see the old computer as **No access** (if they were connected),
+and phones and the desktop app see it as an older copy once the new one is reachable
+(offline, named like a computer they use or see online, and last seen before that one
+joined the account) and offer to remove it; pair again or ask for access to reach the new one.
 
 On the computer, open Codync in the menu bar and choose **Pair iPhone…**, then scan the
 code on the phone (or paste its `codync://pair` link). The host approves the phone's
@@ -186,14 +205,20 @@ A simulator build verifies compilation, not the Dashboard settings or OAuth flow
 The desktop app attaches this computer's host and its SSH computers over loopback; they
 follow into whichever account is active. The account's other computers are not reached
 directly (the encrypted channel wasn't ported to the desktop app), so their
-"Ask for access" rows show status only. See [desktop app](../architecture/desktop-app.md).
+"Ask for access" rows show status only. An older copy of a computer the app uses shows
+*Older copy · last seen …* with *Remove from account* (`DELETE /v1/computers/{id}`, confirmed
+first). See [desktop app](../architecture/desktop-app.md).
 
 **Computers & devices** (Settings) shows, for this computer and each SSH computer:
 *Reach from anywhere* (`setCloud`, on/off; the host's build decides which cloud),
 *Add to account* (claim: `POST /v1/claims` → loopback `claimSign` → complete) and
 *Remove from account* (`unclaim`), a pairing QR, and the authorized devices with revoke.
-A device asking for access raises the menu bar dot and opens the approval sheet with the
-6-digit code; Approve stays disabled until the device revealed its code.
+Signed in, this computer joins the account on its own once per host identity; an identity
+that was already in the account and was removed (here or from a phone) is never re-added
+silently, only through *Add to account*. The section below, *Other computers in your account*,
+lists only the account's other computers. A device asking for access raises the menu bar dot
+and opens the approval sheet with the 6-digit code; Approve stays disabled until the device
+revealed its code.
 
 SSH computers use the system OpenSSH (`apps/desktop/src/main/ssh.ts`): `ssh -G` to
 resolve the target, `ssh-keygen -F` against `~/.ssh/known_hosts` and
